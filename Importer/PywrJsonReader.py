@@ -111,7 +111,7 @@ class Link(object):
         links_attributes[self.name]=attributes_
 
 class Network (object):
-    def __init__(self, name, solver_name, project_id, counter, domains, recorders, network_attributes):
+    def __init__(self, name, solver_name, project_id, counter, domains, recorders, network_attributes, start_time, end_time, timestep):
         attributes_={}
         self.project_id=project_id
         self.name=name+'_'+str(datetime.datetime.now())
@@ -126,6 +126,26 @@ class Network (object):
         attributes_['solver'] = AttributeData('descriptor', solver_name, '-', 'Dimensionless')
         self.attributes.append(ResourceAttr(counter.id, 'solver', 'Input'))
         recourseAttributea.append( RecourseAttribute('NETWORK', counter.id, 'solver', attributes_['solver'], 'Dimensionless'))
+
+        counter.id = counter.id - 1
+        attributes_['timestep'] = AttributeData('descriptor', str(timestep), '-', 'Dimensionless')
+        self.attributes.append(ResourceAttr(counter.id, 'timestep', 'Input'))
+        recourseAttributea.append(
+            RecourseAttribute('NETWORK', counter.id, 'timestep', attributes_['timestep'], 'Dimensionless'))
+
+        counter.id = counter.id - 1
+        attributes_['start_time'] = AttributeData('descriptor', str(start_time), '-', 'Dimensionless')
+        self.attributes.append(ResourceAttr(counter.id, 'start_time', 'Input'))
+        recourseAttributea.append(
+            RecourseAttribute('NETWORK', counter.id, 'start_time', attributes_['start_time'], 'Dimensionless'))
+
+        counter.id = counter.id - 1
+        attributes_['end_time'] = AttributeData('descriptor', str(end_time), '-', 'Dimensionless')
+        self.attributes.append(ResourceAttr(counter.id, 'end_time', 'Input'))
+        recourseAttributea.append(
+            RecourseAttribute('NETWORK', counter.id, 'end_time', attributes_['end_time'], 'Dimensionless'))
+
+
         domain_list=[]
         for domain in domains:
             domain_list.append([domain.name, domain.color])
@@ -177,6 +197,20 @@ class AttributeData (object):
         self.metadata='{}'
         self.value=value
         #self.metadata=metadata
+
+class Recorder(object):
+    def __init__(self, record_):
+        self.type = record_.type
+        if hasattr(record_, "recorders"):
+            self.recorders=record_.recorders
+            self.agg_func=record_.agg_func
+        else:
+            self.node=record_.node
+
+class Domain (object):
+    def __init__(self, domain_):
+        self.name=domain_.name
+        self.color=domain_.color
 
 def get_timeseriesdates(timestepper):
     start=parse(timestepper.start)
@@ -247,19 +281,7 @@ def get_new_attributes(attrlist, c_attrlist):
         new_attr.append(get_dict(attr))
     return new_attr
 
-class Recorder(object):
-    def __init__(self, record_):
-        self.type = record_.type
-        if hasattr(record_, "recorders"):
-            self.recorders=record_.recorders
-            self.agg_func=record_.agg_func
-        else:
-            self.node=record_.node
 
-class Domain (object):
-    def __init__(self, domain_):
-        self.name=domain_.name
-        self.color=domain_.color
 
 def get_dict(obj):
     if not  hasattr(obj,"__dict__"):
@@ -317,7 +339,7 @@ def export (filename, connector):
         for domain_ in x.domains:
             domains.append(Domain(domain_))
 
-        network = Network('Pywr', x.solver.name, Proj.id,counter,  domains, recorders, network_attributes)
+        network = Network('Pywr', x.solver.name, Proj.id,counter,  domains, recorders, network_attributes, x.timestepper.start, x.timestepper.end, x.timestepper.timestep)
 
         for attr_name in network_attributes[network.name].keys():
             if (attr_name in project_attributes):
