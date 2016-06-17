@@ -8,16 +8,12 @@ from datetime import timedelta
 import datetime
 import inspect
 
-#"Dimensionless"
-
 recourseAttributea =[]
 ref_parameters={}
-
 
 class Counter(object):
     def __init__(self):
         self.id=-1
-
 
 class Project (object):
     def __init__(self):
@@ -79,6 +75,10 @@ class Node(object):
                 attributes_[k] =  get_attribute_type_and_value(node_.__dict__.values()[i])
                 self.attributes.append(ResourceAttr(counter.id, k, self.type))
                 recourseAttributea.append(RecourseAttribute('NODE', counter.id, k , attributes_[k],'Dimensionless'))
+        counter.id = counter.id - 1
+        attributes_['node_type'] = get_attribute_type_and_value(node_.type)
+        self.attributes.append(ResourceAttr(counter.id, 'node_type', self.type))
+        recourseAttributea.append(RecourseAttribute('NODE', counter.id, 'node_type', attributes_['node_type'], 'Dimensionless'))
 
         nodes_attributes [self.name]= attributes_
 
@@ -111,36 +111,41 @@ class Link(object):
         links_attributes[self.name]=attributes_
 
 class Network (object):
-    def __init__(self, name, solver_name, project_id, counter, domains, recorders, network_attributes, start_time, end_time, timestep):
+    def __init__(self, name, solver_name, project_id, counter, domains, recorders, network_attributes, timestepper,  metadata=None):
         attributes_={}
         self.project_id=project_id
-        self.name=name+'_'+str(datetime.datetime.now())
+        if(metadata !=None):
+            self.name=metadata.title
+            self.description =metadata.description
+        else:
+            self.name = name + '_' + str(datetime.datetime.now())
+            self.description = "Pywr network"
+
         self.id=-1
         self.attributes = []
         self.nodes=[]
         self.links=[]
         self.scenarios=[Scenario()]
-        self.description = ""
-        self.description = ""
         counter.id = counter.id - 1
+
         attributes_['solver'] = AttributeData('descriptor', solver_name, '-', 'Dimensionless')
         self.attributes.append(ResourceAttr(counter.id, 'solver', 'Input'))
         recourseAttributea.append( RecourseAttribute('NETWORK', counter.id, 'solver', attributes_['solver'], 'Dimensionless'))
 
         counter.id = counter.id - 1
-        attributes_['timestep'] = AttributeData('descriptor', str(timestep), '-', 'Dimensionless')
+        attributes_['timestep'] = AttributeData('descriptor', str(timestepper.timestep), '-', 'Dimensionless')
         self.attributes.append(ResourceAttr(counter.id, 'timestep', 'Input'))
         recourseAttributea.append(
             RecourseAttribute('NETWORK', counter.id, 'timestep', attributes_['timestep'], 'Dimensionless'))
 
         counter.id = counter.id - 1
-        attributes_['start_time'] = AttributeData('descriptor', str(start_time), '-', 'Dimensionless')
+        attributes_['start_time'] = AttributeData('descriptor', str(timestepper.start), '-', 'Dimensionless')
         self.attributes.append(ResourceAttr(counter.id, 'start_time', 'Input'))
         recourseAttributea.append(
             RecourseAttribute('NETWORK', counter.id, 'start_time', attributes_['start_time'], 'Dimensionless'))
 
         counter.id = counter.id - 1
-        attributes_['end_time'] = AttributeData('descriptor', str(end_time), '-', 'Dimensionless')
+        attributes_['end_time'] = AttributeData('descriptor', str(timestepper.end), '-', 'Dimensionless')
         self.attributes.append(ResourceAttr(counter.id, 'end_time', 'Input'))
         recourseAttributea.append(
             RecourseAttribute('NETWORK', counter.id, 'end_time', attributes_['end_time'], 'Dimensionless'))
@@ -221,16 +226,23 @@ def get_timeseriesdates(timestepper):
         timeseries.append(start)
         start = start + timedelta(days=timestep)
 
-def read_timeseries(url):
+def read_timeseries(url, column=None):
     with open(url) as f:
         content = f.read().splitlines()
     head=content[0].split(',')
-    if( head[0].lower()== 'date'):
-        date_index=0
-        value_index=1
+    if column is not None:
+        for i in range(0, len(head)):
+            if(head[i].strip().lower()== 'date'):
+                date_index=i
+            elif (head[i].strip().lower()==column.lower()):
+                    value_index=i
     else:
-        date_index = 1
-        value_index = 0
+        if( head[0].lower()== 'date'):
+            date_index=0
+            value_index=1
+        else:
+            date_index = 1
+            value_index = 0
     values={}
     for i in range (1, len(content)):
         lin=content[i].split(',')
@@ -243,7 +255,7 @@ def read_seasonall(values_):
     month=1
     day=1
     for v in values_:
-        dat=datetime.datetime(year, month, 24)
+        dat=datetime.datetime(year, month, day)
         values[str(dat)]=v
         month+=1
     print values
@@ -260,12 +272,20 @@ def get_attribute_type_and_value(value_):
             type = "array"
             value = json.dumps(value_)
         elif isinstance(value_, basestring):
-            attr = ref_parameters[value_]
-            type = attr.type
-            value = attr.value
+            if(value_ in ref_parameters.keys() ):
+                print ref_parameters[value_]
+                attr = ref_parameters[value_]
+                type = attr.type
+                value = attr.value
+            else:
+                value=value_
+                type='descriptor'
         elif value_.type.lower().startswith("arrayindexed"):
             type = 'timeseries'
-            value = read_timeseries(value_.url)
+            if hasattr(value_, "column"):
+                value = read_timeseries(value_.url, value_.column)
+            else:
+                value = read_timeseries(value_.url)
         elif value_.type.lower().startswith("monthly"):
             type = 'timeseries'
             value = read_seasonall(value_.values)
@@ -332,14 +352,19 @@ def export (filename, connector):
 
         Proj = connector.call('add_project', {'project': project.__dict__})
 
-        print "=============>", x.solver.name
+        if hasattr(x, "recorders"):
+            for recorder_ in x.recorders:
+                recorders.append(Recorder(recorder_))
+        if hasattr(x, "domain_"):
+            for domain_ in x.domains:
+                domains.append(Domain(domain_))
 
-        for recorder_ in x.recorders:
-            recorders.append(Recorder(recorder_))
-        for domain_ in x.domains:
-            domains.append(Domain(domain_))
-
-        network = Network('Pywr', x.solver.name, Proj.id,counter,  domains, recorders, network_attributes, x.timestepper.start, x.timestepper.end, x.timestepper.timestep)
+        if hasattr(x, "metadata"):
+            network = Network('Pywr', x.solver.name, Proj.id, counter, domains, recorders, network_attributes,
+                              x.timestepper, x.metadata)
+        else:
+            network = Network('Pywr', x.solver.name, Proj.id, counter, domains, recorders, network_attributes,
+                              x.timestepper)
 
         for attr_name in network_attributes[network.name].keys():
             if (attr_name in project_attributes):

@@ -69,7 +69,6 @@ def check_args(args):
                                os.path.dirname(args.output)+
                                'does not exist')
 
-
 class PywrExporter(JSONPlugin):
     def __init__(self, args):
         self.connect(args)
@@ -80,6 +79,7 @@ class PywrExporter(JSONPlugin):
                                                    'include_data': 'Y',
                                                    'template_id': self.template_id,
                                                    'scenario_ids': [self.scenario_id]})
+        self.attrlist = self.connection.call('get_all_attributes', {})
 if __name__ == '__main__':
     errors  = []
     steps=7
@@ -89,7 +89,7 @@ if __name__ == '__main__':
         args = parser.parse_args()
         check_args(args)
         pywrexporter=PywrExporter(args)
-        pywrwriter(pywrexporter.net, att)
+        pywrwriter(pywrexporter.net, pywrexporter.attrlist)
     except HydraPluginError, e:
         write_progress(steps, steps)
         log.exception(e)
