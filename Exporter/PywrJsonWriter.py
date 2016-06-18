@@ -114,36 +114,49 @@ def get_dict(obj):
     return result
 
 def get_parameters_refs(nodes, nodes_parameters):
-    print "going to cehck parameters ..."
+    parameters = {}
     for i in range(0, len(nodes)):
         node = nodes[i]
         for j in range(i+1, len(nodes)):
             node_=nodes[j]
             attrs=nodes_parameters[node.name]
             attrs_ = nodes_parameters[node_.name]
-            #print 'length:', len (attrs), len(attrs_)
             for attr in attrs.keys():
                 for attr_ in attrs_.keys():
                     if(attr==attr_):
-                        print "comon parameters", attr, attr_, node.name, node_.name
                         if hasattr(attrs[attr], "type"):
                             if attrs[attr] ['type']== attrs_[attr_]['type']:
                                 if(attrs[attr] ['type']=='arrayindexed'):
                                     if attrs[attr]['url'] == attrs_[attr_]['url']:
-                                        print 'I have found timeseries'
+                                        if (not attr+'_ref' in parameters):
+                                            parameters[attr] = {'type': attrs[attr]['type'],
+                                                            'url': attrs_[attr_]['url']}
                                 else:
                                     print attrs[attr]['values']
                                     print attrs_[attr_]['values']
                                     print 'Compare->: ', (set(attrs[attr]['values']) & set(attrs_[attr_]['values']))
                                     if attrs[attr]['values'] == attrs_[attr_]['values']:
                                         print ' I have found array'
+                                        if (not attr+'_ref' in parameters):
+                                            parameters[attr]={'type': attrs[attr] ['type'], 'values':attrs_[attr_]['values']}
                         else:
                             if attrs[attr] == attrs_[attr_]:
-                                print '=====================================> sclar is found'
-                                print attrs[attr] , attrs_[attr_]
-                                print node.name, node_.name
+                                print attr in parameters
+                                if(not attr+'_ref' in parameters ):
+                                    parameters[attr]=attrs[attr]
+
+    for node in nodes:
+        for key in node:
+            for attr in parameters:
+                    if attr == key and parameters[attr]== node[key]:
+                        node[key]=attr+'_ref'
+                        print node
+
+
+    return  parameters
 
 def pywrwriter (network, attrlist):
+
     #print network
     nodes=[]
     edges=[]
@@ -160,8 +173,7 @@ def pywrwriter (network, attrlist):
     for node_ in network.nodes:
         node=Node(node_, attributes_ids, resourcescenarios_ids, nodes_parameters)
         nodes.append(node)
-        #print "Node =========>", node
-    get_parameters_refs(nodes, nodes_parameters)
+    parameters=get_parameters_refs(nodes, nodes_parameters)
 
     for link_ in network.links:
         link=Link(link_)

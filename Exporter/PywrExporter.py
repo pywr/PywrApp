@@ -83,6 +83,7 @@ class PywrExporter(JSONPlugin):
 if __name__ == '__main__':
     errors  = []
     steps=7
+    steps=7
     try:
         write_progress(1, steps)
         parser = commandline_parser()
