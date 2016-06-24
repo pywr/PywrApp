@@ -48,7 +48,6 @@ class ResourceAttr (object):
 
 class RecourseAttribute (object):
     def __init__(self,  ref_key, resource_attr_id, attr_id, value_, dimen):
-
         self.resource_attr_id=resource_attr_id
         self.attr_id=attr_id
         self.source=ref_key
@@ -158,6 +157,8 @@ class Network (object):
         domain_list=[]
         for domain in domains:
             domain_list.append([domain.name, domain.color])
+
+        print "Domain is ======>", domain_list
 
         counter.id = counter.id - 1
         attributes_['domains'] = AttributeData('array', json.dumps(domain_list), '-', 'Dimensionless')
@@ -359,7 +360,7 @@ def export (filename, connector):
         if hasattr(x, "recorders"):
             for recorder_ in x.recorders:
                 recorders.append(Recorder(recorder_))
-        if hasattr(x, "domain_"):
+        if hasattr(x, "domains"):
             for domain_ in x.domains:
                 domains.append(Domain(domain_))
 
