@@ -15,7 +15,10 @@ class Node(dict):
         attributes={}
         for attr_ in node_.attributes:
             attr=attributes_ids[attr_.attr_id]
+            #This needs to be checked !!!!!!!!!!!!!!!
             res=resourcescenarios_ids[attr_.id]
+            self.position=[node_.x, node_.y]
+
             if(attr.name=='node_type'):
                 self.type=res.value.value
             elif res.value.type == 'descriptor' or res.value.type=='scalar':

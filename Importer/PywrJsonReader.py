@@ -61,8 +61,12 @@ class Node(object):
         self.status = "A"
         self.name = node_.name
         self.description = ""
-        self.x = str(random.randint(0,99))
-        self.y = str(random.randint(0,99))
+        if hasattr(node_, "position"):
+            self.x=str(node_.position[0])
+            self.y=str(node_.position[1])
+        else:
+            self.x = str(random.randint(0,99))
+            self.y = str(random.randint(0,99))
         self.type = node_.type
         attributes_ = {}
         self.attributes = []
@@ -70,7 +74,7 @@ class Node(object):
         print self.name
         for i in range(0, len(node_.__dict__.keys())):
             k=node_.__dict__.keys()[i]
-            if(k.lower() != 'name' and k.lower() !='type'):
+            if(k.lower() != 'name' and k.lower() !='type' and k.lower() !='position'):
                 counter.id=counter.id-1
                 attributes_[k] =  get_attribute_type_and_value(node_.__dict__.values()[i])
                 self.attributes.append(ResourceAttr(counter.id, k, self.type))
@@ -428,11 +432,9 @@ def export (filename, connector):
         for link in network.links:
             for rs in link.attributes:
                 rs.attr_id = attrs_names_ids[rs.attr_id]
-
         #for node in network.nodes:
         #    print get_dict(node)
         #struct=Struct(network)
-
         NetworkSummary = connector.call('add_network', {'net': get_dict(network)})
         return NetworkSummary
 
