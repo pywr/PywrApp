@@ -90,7 +90,7 @@ if __name__ == '__main__':
         args = parser.parse_args()
         check_args(args)
         pywrexporter=PywrExporter(args)
-        pywrwriter(pywrexporter.net, pywrexporter.attrlist)
+        pywrwriter(pywrexporter.net, pywrexporter.attrlist, args.output)
     except HydraPluginError, e:
         write_progress(steps, steps)
         log.exception(e)

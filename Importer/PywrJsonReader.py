@@ -117,9 +117,12 @@ class Network (object):
     def __init__(self, name, solver_name, project_id, counter, domains, recorders, network_attributes, timestepper,  metadata=None):
         attributes_={}
         self.project_id=project_id
+        author=None
         if(metadata !=None):
             self.name=metadata.title
             self.description =metadata.description
+            author=metadata.author
+
         else:
             self.name = name + '_' + str(datetime.datetime.now())
             self.description = "Pywr network"
@@ -129,8 +132,14 @@ class Network (object):
         self.nodes=[]
         self.links=[]
         self.scenarios=[Scenario()]
-        counter.id = counter.id - 1
 
+        if author is not None:
+            counter.id = counter.id - 1
+            attributes_['author'] = AttributeData('descriptor', author, '-', 'Dimensionless')
+            self.attributes.append(ResourceAttr(counter.id, 'author', 'Input'))
+            recourseAttributea.append(RecourseAttribute('NETWORK', counter.id, 'author', attributes_['author'], 'Dimensionless'))
+
+        counter.id = counter.id - 1
         attributes_['solver'] = AttributeData('descriptor', solver_name, '-', 'Dimensionless')
         self.attributes.append(ResourceAttr(counter.id, 'solver', 'Input'))
         recourseAttributea.append( RecourseAttribute('NETWORK', counter.id, 'solver', attributes_['solver'], 'Dimensionless'))
