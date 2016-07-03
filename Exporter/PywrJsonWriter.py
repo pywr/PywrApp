@@ -74,7 +74,6 @@ class Edge(object):
         self.attrs=[nodes_id_name[link_.node_1_id], nodes_id_name[link_.node_2_id]]
         for attr_ in link_.attributes:
             attr = attributes_ids[attr_.attr_id]
-            # This needs to be checked !!!!!!!!!!!!!!!
             res = resourcescenarios_ids[attr_.id]
             if (attr.name == 'slot_from'):
                 if(res.value.value=='None'):
@@ -91,8 +90,6 @@ class Edge(object):
             self.attrs.append(slot_from)
             self.attrs.append(slot_to)
 
-
-
 class Parameter(object):
     def __init__(self):
         pass
@@ -102,8 +99,33 @@ class Value(object):
         pass
 
 class Recorder(object):
-    def __init__(self):
-        pass
+    def __init__(self, value):
+
+        if(len(value)==2):
+            self.node=value[1]
+            self.type=value[0]
+        elif (len(value)==3):
+            try:
+                recs=json.loads(value[1])
+                self.type=value[0]
+                self.recorders=recs
+                self.agg_func=value[2]
+            except:
+                self.name=value[2]
+                self.node = value[1]
+                self.type = value[0]
+
+def get_recotds(network, attributes_ids, resourcescenarios_ids):
+    recorders=[]
+    for attr_ in network.attributes:
+        attr = attributes_ids[attr_.attr_id]
+        res = resourcescenarios_ids[attr_.id]
+        if (attr.name == 'recorders'):
+            values=json.loads(res.value.value)
+            for value in values:
+                recorders.append(Recorder(value))
+    return recorders
+
 
 class Domain(object):
     def __init__(self, name, color):
@@ -120,26 +142,23 @@ class Solver(object):
             if (attr.name == 'solver'):
                 self.name=res.value.value
 
-
 class Timestepper(object):
     def __init__(self, network, attributes_ids, resourcescenarios_ids):
         for attr_ in network.attributes:
             attr = attributes_ids[attr_.attr_id]
-            # This needs to be checked !!!!!!!!!!!!!!!
             res = resourcescenarios_ids[attr_.id]
-            if (attr.name == 'start'):
-                start = res.value.value
-            elif (attr.name == 'end'):
-                end = res.value.value
+            if (attr.name == 'start_time'):
+                self.start = res.value.value
+            elif (attr.name == 'end_time'):
+                self.end = res.value.value
             elif (attr.name == 'timestep'):
-                timestep = res.value.value
+                self.timestep = res.value.value
 
 class Metadata (object):
     def __init__(self, network, resourcescenarios_ids, attributes_ids):
        self.title=network.name
        for attr_ in network.attributes:
            attr = attributes_ids[attr_.attr_id]
-           # This needs to be checked !!!!!!!!!!!!!!!
            res = resourcescenarios_ids[attr_.id]
            if (attr.name == 'author'):
                self.author = res.value.value
@@ -170,14 +189,14 @@ def get_dict(obj):
 
 class PywrNetwork (object):
     def __init__(self, metadata, timestepper, solver, nodes, edges, domains, parameters, recorders):
-        self.metadata=metadata
-        self.timestepper=timestepper
-        self.solver=solver
-        self.nodes=nodes
-        self.edges=edges
-        self.domains=domains
         self.parameters=parameters
         self.recorders=recorders
+        self.domains=domains
+        self.nodes=nodes
+        self.edges=edges
+        self.solver=solver
+        self.timestepper=timestepper
+        self.metadata=metadata
 
 def get_parameters_refs(nodes, nodes_parameters):
     parameters = {}
@@ -225,19 +244,15 @@ def pywrwriter (network, attrlist, output_file):
     nodes=[]
     edges=[]
     nodes_parameters={}
-    recorders=[]
     parameters=[]
     domains=[]
     attributes_ids={}
-
-
     for attr in attrlist:
         attributes_ids[attr.id]=attr
     resourcescenarios_ids=get_resourcescenarios_ids(network.scenarios[0].resourcescenarios)
     timestepper=Timestepper(network, attributes_ids, resourcescenarios_ids)
-
     metadata = Metadata(network, resourcescenarios_ids, attributes_ids)
-
+    recorders=get_recotds(network, attributes_ids, resourcescenarios_ids)
     domains=[]
     for attr_ in network.attributes:
         attr = attributes_ids[attr_.attr_id]
@@ -260,7 +275,6 @@ def pywrwriter (network, attrlist, output_file):
         edge=Edge(link_, attributes_ids, resourcescenarios_ids, nodes_id_name)
         edges.append(edge.attrs)
     for node in nodes:
-        print "Type is: ",  node.type
         for i in range(0, len(node.__dict__.keys())):
             k = node.__dict__.keys()[i]
             if (k.lower() != 'name' and k.lower() != 'type' and k.lower() != 'position'):
@@ -268,18 +282,10 @@ def pywrwriter (network, attrlist, output_file):
                 if type(value) is dict:
                     if value['type'] == 'arrayindexed':
                         file_name=node.name+"_"+k+'.csv'
-                        print "dict is: ",node.name, k#, node.__dict__.values()[i]
                         write_time_series_tofile(value['url'], file_name)
-                        if hasattr(node, "column"):
-                            pass
                         value['url']=file_name
 
-
-
-
     pywrNetwork=PywrNetwork(metadata, timestepper, solver, nodes, edges, domains, parameters, recorders)
-
-
 
     with open(output_file, "w") as text_file:
         text_file.write(json.dumps(get_dict(pywrNetwork), indent=2))
