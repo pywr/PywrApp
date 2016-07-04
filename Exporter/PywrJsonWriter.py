@@ -86,7 +86,7 @@ class Edge(object):
                 else:
                     slot_to = res.value.value
 
-        if(slot_to !='None' or slot_from !='None'):
+        if(slot_to !=None or slot_from !=None):
             self.attrs.append(slot_from)
             self.attrs.append(slot_to)
 
@@ -288,7 +288,7 @@ def pywrwriter (network, attrlist, output_file):
     pywrNetwork=PywrNetwork(metadata, timestepper, solver, nodes, edges, domains, parameters, recorders)
 
     with open(output_file, "w") as text_file:
-        text_file.write(json.dumps(get_dict(pywrNetwork), indent=2))
+        text_file.write(json.dumps(get_dict(pywrNetwork)), indent=2)
 
 
 
