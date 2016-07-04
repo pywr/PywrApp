@@ -22,7 +22,11 @@
                 "column": "Flow"
             },
             "cost": -999,
-            "position": [-1, 51.5]
+            "position":
+        {
+            "schematic": [5, -20],
+            "geographic": [-1.509445, 51.30284]
+        }
         },
         {
             "name": "reservoir1",

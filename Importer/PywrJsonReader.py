@@ -55,21 +55,34 @@ class RecourseAttribute (object):
 
 class Node(object):
     def __init__(self, node_, counter, nodes_attributes):
+        attributes_ = {}
+        self.attributes = []
+        ras = []
+        self.x=None
+        self.y=None
         i=0
         self.id = counter.id
         self.status = "A"
         self.name = node_.name
+        self.type = node_.type
         self.description = ""
         if hasattr(node_, "position"):
-            self.x=str(node_.position[0])
-            self.y=str(node_.position[1])
-        else:
+            if(node_.position != None and len (node_.position)==2):
+                self.x=str(node_.position.schematic[0])
+                self.y=str(node_.position.schematic[1])
+            #######
+            if (node_.position.geographic != None and len(node_.position.geographic) == 2):
+                counter.id = counter.id - 1
+                attributes_['geographic'] = get_attribute_type_and_value(node_.position.geographic)
+                self.attributes.append(ResourceAttr(counter.id, 'geographic', self.type))
+                recourseAttributea.append(RecourseAttribute('NODE', counter.id, 'geographic', attributes_['geographic'], 'Dimensionless'))
+
+        if(self.x == None):
             self.x = str(random.randint(0,99))
+        if(self.y==None):
             self.y = str(random.randint(0,99))
-        self.type = node_.type
-        attributes_ = {}
-        self.attributes = []
-        ras=[]
+
+
         print self.name
         for i in range(0, len(node_.__dict__.keys())):
             k=node_.__dict__.keys()[i]

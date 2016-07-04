@@ -13,20 +13,31 @@ class Node(dict):
     def __init__(self, node_, attributes_ids, resourcescenarios_ids, nodes_parameters):
         self.name=node_.name
         attributes={}
-
+        geographic=None
         for attr_ in node_.attributes:
             attr=attributes_ids[attr_.attr_id]
             #This needs to be checked !!!!!!!!!!!!!!!
             res=resourcescenarios_ids[attr_.id]
             if(attr.name=='node_type'):
                 self.type=res.value.value
+            elif attr.name == 'geographic':
+                geographic = json.loads(res.value.value)
             elif res.value.type == 'descriptor' or res.value.type=='scalar':
                 self.__dict__[attr.name]=res.value.value
                 attributes[attr.name] = self.__dict__[attr.name]
             elif res.value.type == 'timeseries':
                 self.__dict__[attr.name] = get_timesreies_values(res.value.value, attr.name)
                 attributes[attr.name]=self.__dict__[attr.name]
-        self.position = [node_.x, node_.y]
+
+
+        self.position = {}
+
+        self.position['schematic'] = [node_.x, node_.y]
+        if(geographic==None):
+            self.position['geographic'] = []
+        else:
+            self.position['geographic'] = geographic
+
         nodes_parameters[self.name]=attributes
 
 def get_timesreies_values(value, column):
@@ -288,7 +299,7 @@ def pywrwriter (network, attrlist, output_file):
     pywrNetwork=PywrNetwork(metadata, timestepper, solver, nodes, edges, domains, parameters, recorders)
 
     with open(output_file, "w") as text_file:
-        text_file.write(json.dumps(get_dict(pywrNetwork)), indent=2)
+        text_file.write(json.dumps(get_dict(pywrNetwork), indent=2))
 
 
 
