@@ -11,6 +11,7 @@ import inspect
 recourseAttributea =[]
 ref_parameters={}
 
+
 class Counter(object):
     def __init__(self):
         self.id=-1
@@ -67,35 +68,32 @@ class Node(object):
         self.type = node_.type
         self.description = ""
         if hasattr(node_, "position"):
-            if(node_.position != None and len (node_.position)==2):
-                self.x=str(node_.position.schematic[0])
-                self.y=str(node_.position.schematic[1])
-            #######
-            if (node_.position.geographic != None and len(node_.position.geographic) == 2):
-                counter.id = counter.id - 1
-                attributes_['geographic'] = get_attribute_type_and_value(node_.position.geographic)
-                self.attributes.append(ResourceAttr(counter.id, 'geographic', self.type))
-                recourseAttributea.append(RecourseAttribute('NODE', counter.id, 'geographic', attributes_['geographic'], 'Dimensionless'))
+            if hasattr(node_.position, "position"):
+                if(node_.position.schematic != None and len (node_.position.schematic)==2):
+                    self.x=str(node_.position.schematic[0])
+                    self.y=str(node_.position.schematic[1])
+
+            if hasattr(node_.position, "geographic"):
+                if (node_.position.geographic != None and len(node_.position.geographic) == 2):
+                    #counter.id = counter.id - 1
+                    #attributes_['geographic'] = \
+                    get_attribute_type_and_value(node_.position.geographic, 'geographic', counter, attributes_, self.attributes)
+                    #self.attributes.append(ResourceAttr(counter.id, 'geographic', self.type))
+                    #recourseAttributea.append(RecourseAttribute('NODE', counter.id, 'geographic', attributes_['geographic'], 'Dimensionless'))
 
         if(self.x == None):
             self.x = str(random.randint(0,99))
         if(self.y==None):
             self.y = str(random.randint(0,99))
 
-
-        print self.name
         for i in range(0, len(node_.__dict__.keys())):
             k=node_.__dict__.keys()[i]
             if(k.lower() != 'name' and k.lower() !='type' and k.lower() !='position'):
-                counter.id=counter.id-1
-                attributes_[k] =  get_attribute_type_and_value(node_.__dict__.values()[i])
-                self.attributes.append(ResourceAttr(counter.id, k, self.type))
-                recourseAttributea.append(RecourseAttribute('NODE', counter.id, k , attributes_[k],'Dimensionless'))
-        counter.id = counter.id - 1
-        attributes_['node_type'] = get_attribute_type_and_value(node_.type)
-        self.attributes.append(ResourceAttr(counter.id, 'node_type', self.type))
-        recourseAttributea.append(RecourseAttribute('NODE', counter.id, 'node_type', attributes_['node_type'], 'Dimensionless'))
+                val=node_.__dict__.values()[i]
+                get_attribute_type_and_value(val, k, counter, attributes_, self.type, self.attributes)
 
+
+        get_attribute_type_and_value(node_.type, 'node_type', counter, attributes_, self.type, self.attributes)
         nodes_attributes [self.name]= attributes_
 
 class Link(object):
@@ -135,7 +133,6 @@ class Network (object):
             self.name=metadata.title
             self.description =metadata.description
             author=metadata.author
-
         else:
             self.name = name + '_' + str(datetime.datetime.now())
             self.description = "Pywr network"
@@ -180,7 +177,6 @@ class Network (object):
         for domain in domains:
             domain_list.append([domain.name, domain.color])
 
-        print "Domain is ======>", domain_list
 
         counter.id = counter.id - 1
         attributes_['domains'] = AttributeData('array', json.dumps(domain_list), '-', 'Dimensionless')
@@ -220,15 +216,18 @@ class Resourcescenario(object):
         self.value=value
 
 class AttributeData (object):
-    def __init__(self,  type, value, unit, dimen):
+    def __init__(self,  type, value, unit, dimen, metadata=None):
         self.hidden='N'
         self.type=type
         self.name = 'pywerApp'
         self.unit=unit
         self.dimension=dimen
-        self.metadata='{}'
+        if(metadata is None):
+            self.metadata='{}'
+        else:
+            self.metadata =json.dumps(metadata)
         self.value=value
-        #self.metadata=metadata
+
 
 class Recorder(object):
     def __init__(self, record_):
@@ -251,25 +250,30 @@ def get_timeseriesdates(timestepper):
     timeseries=[]
     while (end>=start):
         timeseries.append(start)
+
         start = start + timedelta(days=timestep)
 
-def read_timeseries(url, column=None):
+def read_data_file(url, column=None):
     with open(url) as f:
         content = f.read().splitlines()
-    head=content[0].split(',')
+    head = content[0].split(',')
     if column is not None:
         for i in range(0, len(head)):
-            if(head[i].strip().lower()== 'date'):
-                date_index=i
-            elif (head[i].strip().lower()==column.lower()):
-                    value_index=i
+            if (head[i].strip().lower() == 'date' or head[i].strip().lower() == 'index'):
+                date_index = i
+            elif (head[i].strip().lower() == column.lower()):
+                value_index = i
     else:
-        if( head[0].lower()== 'date'):
-            date_index=0
-            value_index=1
+        if (head[0].lower() == 'date' or head[0].lower() == 'Index'):
+            date_index = 0
+            value_index = 1
         else:
             date_index = 1
             value_index = 0
+    return content, date_index, value_index
+
+def read_timeseries(url, column=None):
+    content, date_index, value_index=read_data_file(url, column)
     values={}
     for i in range (1, len(content)):
         lin=content[i].split(',')
@@ -277,47 +281,229 @@ def read_timeseries(url, column=None):
     return json.dumps({'0' :values})
 
 def read_seasonall(values_):
-    values={}
-    year=9999
-    month=1
-    day=1
-    for v in values_:
-        dat=datetime.datetime(year, month, day)
-        values[str(dat)]=v
-        month+=1
-    print values
+    from datetime import date
+    values = {}
+    year = 9999
+    month = 1
+    day = 1
+    #check if the data is saved on file
+    if hasattr(values_, 'url'):
+        if hasattr(values_, 'column'):
+            content, date_index, value_index = read_data_file(values_.url, values_.column)
+        else:
+            content, date_index, value_index = read_data_file(values_.url)
+        for i in range(1, len(content)):
+            lin = content[i].split(',')
+            ss=int (lin[date_index])
+            if (values_.type.lower == 'monthlyprofile'):
+                month = ss
+                dat = datetime.datetime(year, ss, day)
+            else:
+                # account for 356 days (leap year) which Hydra 9999 seasonal data does not support
+                if(ss>365):
+                    continue
+                dat=date.fromordinal(date(year, month, day).toordinal() + ss - 1)
+
+            values[str(dat)] = lin[value_index]
+    else:
+        for v in values_.values:
+            dat=datetime.datetime(year, month, day)
+            values[str(dat)]=v
+            if(values_.type.lower=='monthlyprofile'):
+                month+=1
+            else:
+                day+=1
     return json.dumps({'0': values})
 
-def get_attribute_type_and_value(value_):
+def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_attributes=None):
+    metadata = {}
+    metadata['single'] = 'yes'
     try:
         float(value_)
         value = str(value_)
         type = 'scalar'
     except:
-        print isinstance(value_, list)
         if isinstance(value_, list):
             type = "array"
             value = json.dumps(value_)
         elif isinstance(value_, basestring):
-            if(value_ in ref_parameters.keys() ):
-                print ref_parameters[value_]
+            if(value_ in ref_parameters.keys()):
                 attr = ref_parameters[value_]
                 type = attr.type
                 value = attr.value
+                metadata=json.loads(attr.metadata)
+                if( 'type' in metadata.keys()):
+                    if(metadata['type']=='aggregated'):
+                        get_aggregated(json.loads(value), counter, attributes_, _type, res_attributes)
+                    elif(metadata['type']=='indexedarray'):
+                        get_aggregated(json.loads(value), counter, attributes_, _type, res_attributes)
+                        if ('index_parameter' in metadata.keys()):
+                            index_parameter = metadata['index_parameter']
+                            get_attribute_type_and_value(index_parameter, index_parameter, counter, attributes_, _type, res_attributes)
+                    elif (metadata['type'] == 'controlcurveindex'):
+                        get_aggregated(json.loads(value), counter, attributes_, _type, res_attributes)
             else:
                 value=value_
                 type='descriptor'
-        elif value_.type.lower().startswith("arrayindexed"):
-            type = 'timeseries'
-            if hasattr(value_, "column"):
-                value = read_timeseries(value_.url, value_.column)
-            else:
-                value = read_timeseries(value_.url)
-        elif value_.type.lower().startswith("monthly"):
-            type = 'timeseries'
-            value = read_seasonall(value_.values)
+        elif hasattr(value_, "type"):
+            metadata['type'] = value_.type.lower()
+            if value_.type.lower() =='constant':
+                value = str(value_.values)
+                type = 'scalar'
+            elif value_.type.lower() == "arrayindexed":
+                type = 'timeseries'
+                metadata['type'] = 'arrayindexed'
+                if hasattr(value_, "column"):
+                    value = read_timeseries(value_.url, value_.column)
+                    metadata['column']=value_.column
+                else:
+                    value = read_timeseries(value_.url)
+            elif value_.type.lower()== "monthlyprofile" or value_.type.lower()== "dailyprofile":
+                type = 'timeseries'
+                metadata['type']=value_.type
+                value = read_seasonall(value_)
+                if hasattr(value_, "column"):
+                    metadata['column'] = value_.column
+            elif value_.type.lower() == 'aggregated':
+                get_aggregated_attribute(value_, name, counter, attributes_, _type, res_attributes)
+                return
+            elif value_.type.lower() == 'indexedarray':
+                get_indexedarray_attributes(value_, name, counter, attributes_, _type,  res_attributes)
 
-    return AttributeData(type, value, '-', 'Dimensionless')
+                return
+            elif value_.type.lower() == 'controlcurveindex':
+                get_controlcurveindex_attributes(value_, name, counter, attributes_, _type, res_attributes)
+                return
+            elif value_.type.lower() =='monthlyprofilecontrolcurve':
+                get_monthlyprofilecontrolcurve_attributes(value_, name, counter, attributes_, _type, res_attributes)
+                return
+            elif value_.type.lower() == 'controlcurveinterpolated':
+                get_controlcurveinterpolated_attributes(value_, name, counter, attributes_, _type, res_attributes)
+                return
+
+
+    if hasattr(value_, "comment"):
+        metadata['comment']=value_.comment
+    counter.id = counter.id - 1
+    attributes_[name] = AttributeData(type, value, '-', 'Dimensionless', metadata)
+    if(res_attributes!=None):
+        res_attributes.append(ResourceAttr(counter.id, name, _type))
+        recourseAttributea.append(RecourseAttribute('NODE', counter.id, name , attributes_[name],'Dimensionless'))
+
+def get_aggregated_attribute(value_, name, counter, attributes_, _type, res_attributes=None):
+    metadata={}
+    type = 'array'
+    value = json.dumps(value_.parameters)
+    metadata['single'] = 'no'
+    metadata['agg_func'] = value_.agg_func
+    metadata['type'] = 'aggregated'
+    if hasattr(value_, "comment"):
+        metadata['comment'] = value_.comment
+
+    counter.id = counter.id - 1
+    attr= AttributeData(type, value, '-', 'Dimensionless', metadata)
+    attributes_[name] =attr
+    if(res_attributes != None):
+        res_attributes.append(ResourceAttr(counter.id, name, _type))
+        recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
+    get_aggregated (json.loads(attributes_[name].value), counter, attributes_,_type,  res_attributes)
+
+def get_aggregated(paras, counter, attributes_, _type, res_attributes):
+    for para in paras:
+        get_attribute_type_and_value(para, para, counter, attributes_, _type, res_attributes)
+
+def get_indexedarray_attributes(value_, name, counter, attributes_, _type, res_attributes=None):
+    metadata={}
+    type = 'array'
+    metadata['single'] = 'no'
+    metadata['type'] = 'indexedarray'
+    if hasattr(value_, "comment"):
+        metadata['comment'] = value_.comment
+    index_list = get_indexedarray(value_.params, name, counter, attributes_, _type, res_attributes=None)
+    value = json.dumps(index_list)
+
+    if hasattr(value_, "index_parameter"):
+        index_parameter=value_.index_parameter
+        metadata['index_parameter']=index_parameter
+    attr = AttributeData(type, value, '-', 'Dimensionless', metadata)
+    counter.id = counter.id - 1
+    attributes_[name] = attr
+    if (res_attributes != None):
+        res_attributes.append(ResourceAttr(counter.id, name, _type))
+        recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
+
+def get_indexedarray(params, name, counter, attributes_, _type, res_attributes=None):
+    index_list=[]
+    ind=1
+    for item in params:
+        ind += 1
+        name_ = name + "_" + str(ind)
+        get_attribute_type_and_value(item, name_, counter, attributes_, _type, res_attributes)
+        index_list.append(name_)
+    return index_list
+
+
+def get_controlcurveindex_attributes(value_, name, counter, attributes_, _type, res_attributes):
+    metadata = {}
+    type='array'
+    metadata ['type'] = 'controlcurveindex'
+    metadata['single'] = 'no'
+    if hasattr(value_, "storage_node"):
+        metadata['storage_node']=value_.storage_node
+    if hasattr(value_, "comment"):
+        metadata['comment'] = value_.comment
+    value=value_.control_curves
+    for item in value:
+        get_attribute_type_and_value(item, item, counter, attributes_, _type, res_attributes)
+    attr = AttributeData(type, json.dumps(value), '-', 'Dimensionless', metadata)
+    counter.id = counter.id - 1
+    attributes_[name] = attr
+    if (res_attributes != None):
+        res_attributes.append(ResourceAttr(counter.id, name, _type))
+        recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
+
+def get_monthlyprofilecontrolcurve_attributes(value_, name, counter, attributes_, _type, res_attributes):
+    metadata = {}
+    type = 'array'
+    metadata['type'] = 'monthlyprofilecontrolcurve'
+    metadata['single'] = 'no'
+    if hasattr(value_, "storage_node"):
+        metadata['storage_node'] = value_.storage_node
+    if hasattr(value_, "comment"):
+        metadata['comment'] = value_.comment
+    if hasattr(value_, "scale"):
+        metadata['scale'] = str(value_.scale)
+    values_list=[name+'_profile', name+'_control_curve', name+'_values']
+
+    get_attribute_type_and_value(value_.profile, name + '_profile', counter, attributes_, _type, res_attributes)
+    get_attribute_type_and_value(value_.control_curve, name + '_control_curve', counter, attributes_, _type, res_attributes)
+    get_attribute_type_and_value(value_.values, name + '_values', counter, attributes_, _type, res_attributes)
+    counter.id = counter.id - 1
+    attr = AttributeData(type, json.dumps(values_list), '-', 'Dimensionless', metadata)
+
+    attributes_[name] = attr
+    if (res_attributes != None):
+        res_attributes.append(ResourceAttr(counter.id, name, _type))
+        recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
+
+def get_controlcurveinterpolated_attributes(value_, name, counter, attributes_, _type, res_attributes):
+    type = 'array'
+    metadata = {}
+    metadata['single'] = 'no'
+    metadata['type']='ControlCurveInterpolated'
+    if hasattr(value_, "comment"):
+        metadata['comment'] = value_.comment
+    control_curve=value_.control_curve
+    get_attribute_type_and_value(control_curve, name + 'control_curve', counter, attributes_, _type, res_attributes)
+    counter.id = counter.id - 1
+
+    val=[name + 'control_curve']
+    attr = AttributeData(type, json.dumps(val), '-', 'Dimensionless', metadata)
+
+    attributes_[name] = attr
+    if (res_attributes != None):
+        res_attributes.append(ResourceAttr(counter.id, name, _type))
+        recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
 
 def get_new_attributes(attrlist, c_attrlist):
     new_attr=[]
@@ -327,8 +513,6 @@ def get_new_attributes(attrlist, c_attrlist):
                 break
         new_attr.append(get_dict(attr))
     return new_attr
-
-
 
 def get_dict(obj):
     if not  hasattr(obj,"__dict__"):
@@ -346,7 +530,6 @@ def get_dict(obj):
             element = get_dict(obj.__dict__[key])
         result[key] = element
     return result
-
 
 def export (filename, connector):
         counter=Counter()
@@ -373,7 +556,6 @@ def export (filename, connector):
         x = json.loads(json_string, object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
         timeseries=get_timeseriesdates(x.timestepper)
         project=Project()
-        print jsonpickle.dumps(project).replace("/","_").replace("\"", '\'')
 
         request=jsonpickle.dumps(project).replace("/","_").replace("\"", '\'')
 
@@ -408,11 +590,8 @@ def export (filename, connector):
             for i in range(0, len(x.parameters.__dict__.keys())):
                 k = x.parameters.__dict__.keys()[i]
                 counter.id = counter.id - 1
-                attribute = get_attribute_type_and_value(x.parameters.__dict__.values()[i])
-                ref_parameters[k] = attribute
-                # recourseAttributea.append(RecourseAttribute('REF', counter.id, k, attribute, 'Dimensionless'))
+                get_attribute_type_and_value(x.parameters.__dict__.values()[i], k, counter, ref_parameters, 'default')
 
-        print x.timestepper.start, x.timestepper.end, x.timestepper.timestep
         for node_ in x.nodes:
             node = Node(node_, counter, nodes_attributes)
             nodes_ids[node_.name] = node.id
@@ -424,8 +603,7 @@ def export (filename, connector):
                 else:
                     attr=Attribute(attr_name)
                     project_attributes[attr_name]=attr
-                #rr=Resourcescenario('NODE', node.id, attr_name, value)
-                #network.scenario.resourcescenarios.append()
+
 
         for edge_ in x.edges:
            link=Link(edge_, nodes_ids, counter, links_attributes)
@@ -444,7 +622,10 @@ def export (filename, connector):
         for tt in attributes:
             attrs_names_ids[tt.name]=tt.id
         for rs in recourseAttributea:
-            rs.attr_id=attrs_names_ids[rs.attr_id]
+            try:
+                rs.attr_id=attrs_names_ids[rs.attr_id]
+            except:
+                print "Error-------------->", rs.attr_id
         network.scenarios[0].resourcescenarios=recourseAttributea
 
         for rs in network.attributes:
@@ -455,18 +636,8 @@ def export (filename, connector):
         for link in network.links:
             for rs in link.attributes:
                 rs.attr_id = attrs_names_ids[rs.attr_id]
-        #for node in network.nodes:
-        #    print get_dict(node)
-        #struct=Struct(network)
+
         NetworkSummary = connector.call('add_network', {'net': get_dict(network)})
         return NetworkSummary
 
-if __name__ == '__main__':
-    array=[3, 2]
-    print array
-    array2=[array, [4, 3]]
-    print len (array2)
-    print len(array)
-    for ar in array2:
-        print ar
-    export('pywr.json')
+
