@@ -91,10 +91,16 @@ if __name__ == '__main__':
         check_args(args)
         pywrexporter=PywrExporter(args)
         pywrwriter(pywrexporter.net, pywrexporter.attrlist, args.output)
+        text = PluginLib.create_xml_response('Pywr Exporter', (args.network_id), [args.scenario_id],
+                                             message="Data export was successful.",
+                                             errors=errors)
     except HydraPluginError, e:
         write_progress(steps, steps)
         log.exception(e)
         errors = [e.message]
+        text = PluginLib.create_xml_response('Pywr Exporter', (args.network_id), [args.scenario_id],
+                                             message="Error while exporting data.",
+                                             errors=errors)
     except Exception, e:
         log.exception(e)
         errors = []
@@ -103,3 +109,10 @@ if __name__ == '__main__':
                 errors = [e.strerror]
         else:
             errors = [e.message]
+        text = PluginLib.create_xml_response('Pywr Exporter', (args.network_id), [args.scenario_id],
+                                             message="Error while exporting data.",
+                                             errors=errors)
+    print text
+
+
+

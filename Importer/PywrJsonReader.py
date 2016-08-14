@@ -149,10 +149,11 @@ class Network (object):
             self.attributes.append(ResourceAttr(counter.id, 'author', 'Input'))
             recourseAttributea.append(RecourseAttribute('NETWORK', counter.id, 'author', attributes_['author'], 'Dimensionless'))
 
-        counter.id = counter.id - 1
-        attributes_['solver'] = AttributeData('descriptor', solver_name, '-', 'Dimensionless')
-        self.attributes.append(ResourceAttr(counter.id, 'solver', 'Input'))
-        recourseAttributea.append( RecourseAttribute('NETWORK', counter.id, 'solver', attributes_['solver'], 'Dimensionless'))
+        if(solver_name != None):
+            counter.id = counter.id - 1
+            attributes_['solver'] = AttributeData('descriptor', solver_name, '-', 'Dimensionless')
+            self.attributes.append(ResourceAttr(counter.id, 'solver', 'Input'))
+            recourseAttributea.append( RecourseAttribute('NETWORK', counter.id, 'solver', attributes_['solver'], 'Dimensionless'))
 
         counter.id = counter.id - 1
         attributes_['timestep'] = AttributeData('descriptor', str(timestepper.timestep), '-', 'Dimensionless')
@@ -182,7 +183,7 @@ class Network (object):
         attributes_['domains'] = AttributeData('array', json.dumps(domain_list), '-', 'Dimensionless')
         self.attributes.append(ResourceAttr(counter.id, 'domains', 'Input'))
         recourseAttributea.append(
-            RecourseAttribute('NETWORK', counter.id, 'solver', attributes_['domains'], 'Dimensionless'))
+                RecourseAttribute('NETWORK', counter.id, 'domains', attributes_['domains'], 'Dimensionless'))
 
         recorders_list=[]
         for recorder in recorders:
@@ -199,7 +200,7 @@ class Network (object):
         attributes_['recorders'] = AttributeData('array', json.dumps(recorders_list), '-', 'Dimensionless')
         self.attributes.append(ResourceAttr(counter.id, 'recorders', 'Input'))
         recourseAttributea.append(
-            RecourseAttribute('NETWORK', counter.id, 'solver', attributes_['recorders'], 'Dimensionless'))
+            RecourseAttribute('NETWORK', counter.id, 'recorders', attributes_['recorders'], 'Dimensionless'))
         network_attributes[self.name] = attributes_
 
 class Scenario(object):
@@ -364,6 +365,8 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
                 value = read_seasonall(value_)
                 if hasattr(value_, "column"):
                     metadata['column'] = value_.column
+                if hasattr(value_, "parse_dates"):
+                    metadata['parse_dates'] = str(value_.parse_dates)
             elif value_.type.lower() == 'aggregated':
                 get_aggregated_attribute(value_, name, counter, attributes_, _type, res_attributes)
                 return
@@ -568,11 +571,14 @@ def export (filename, connector):
             for domain_ in x.domains:
                 domains.append(Domain(domain_))
 
-        if hasattr(x, "metadata"):
+        if hasattr(x, "metadata") and hasattr(x, "solver"):
             network = Network('Pywr', x.solver.name, Proj.id, counter, domains, recorders, network_attributes,
                               x.timestepper, x.metadata)
-        else:
+        elif hasattr(x, "solver"):
             network = Network('Pywr', x.solver.name, Proj.id, counter, domains, recorders, network_attributes,
+                              x.timestepper)
+        else:
+            network = Network('Pywr', None, Proj.id, counter, domains, recorders, network_attributes,
                               x.timestepper)
 
         for attr_name in network_attributes[network.name].keys():
