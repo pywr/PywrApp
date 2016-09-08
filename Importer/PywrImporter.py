@@ -13,7 +13,7 @@ from HydraLib.hydra_dateutil import reindex_timeseries
 from HydraLib import PluginLib
 
 from HydraLib.PluginLib import write_progress, write_output
-from PywrJsonReader import export
+from PywrJsonReader import import_net
 
 
 
@@ -56,17 +56,18 @@ class HydraConnector(JSONPlugin):
 
 
 if __name__ == '__main__':
-    message=""
-    try:
+        message=""
+   # try:
         parser = commandline_parser()
+
         args = parser.parse_args()
         connector=HydraConnector(args)
 
-        network=export(args.json_file, connector.connection)
+        network=import_net(args.json_file, connector.connection)
         text = PluginLib.create_xml_response('Pywr importer', (network.id), [network.scenarios[0].id],
                                              message="Data import was successful.",
                                              errors=[])
-    except Exception, e:
-        error = [e.message]
-        text = PluginLib.create_xml_response('Pywr importer', "", "", message="Error while importing data",errors=error)
-    print text
+  #  except Exception, e:
+   #     error = [e.message]
+   #     text = PluginLib.create_xml_response('Pywr importer', "", "", message="Error while importing data",errors=error)
+        print text

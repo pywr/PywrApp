@@ -7,10 +7,21 @@ from datetime import datetime
 from datetime import timedelta
 import datetime
 import inspect
+import os
 
 nodes_parameters = {}
 
 parameters = {}
+
+class Recorderthreshold (object):
+    def __init__(self, attr, res, metadata, single_parameters):
+        to_be_deleted=[]
+        self.type = 'recorderthreshold'
+        self.type=metadata['type']
+        self.recorder=metadata['recorder']
+        self.predicate=metadata['predicate']
+        self.threshold=float(metadata['threshold'])
+        self.values=json.loads(res.value.value)
 
 
 class Aggregated (object):
@@ -76,28 +87,33 @@ class Monthlyprofilecontrolcurve (object):
 
         if (self.profile in single_parameters.keys()):
             to_be_deleted.append(self.profile)
+            self.profile=single_parameters[self.profile]
 
         if (self.control_curve in single_parameters.keys()):
             to_be_deleted.append(self.control_curve)
+            self.control_curve = single_parameters[self.control_curve]
 
 
         if (self.values in single_parameters.keys()):
             to_be_deleted.append(self.values )
+            self.values = single_parameters[self.values]
 
         for item in to_be_deleted:
-            parameters[item] = single_parameters[item]
+            #parameters[item] = single_parameters[item]
             del single_parameters[item]
-
 
 
 class ControlCurveInterpolated (object):
     def __init__(self, attr, res, metadata, single_parameters):
         self.type='ControlCurveInterpolated'
-        self.control_curve=json.loads(res.value.value)[0]
-
+        self.control_curve =metadata['control_curve']
+        self.values=json.loads(res.value.value)
+        self.storage_node=metadata['storage_node']
         if (self.control_curve in single_parameters.keys()):
             parameters[self.control_curve] = single_parameters[self.control_curve]
             del single_parameters[self.control_curve]
+
+
 
 def adjuest_parameters(complex_attrinbtes):
     to_be_deleted=[]
@@ -133,6 +149,8 @@ def adjuest_parameters(complex_attrinbtes):
 
             if (attr.values in complex_attrinbtes.keys()):
                 to_be_deleted.append(attr.values)
+        elif (attr.type == 'recorderthreshold'):
+            pass
 
     for item in to_be_deleted:
         parameters[item] = complex_attrinbtes[item]
@@ -165,10 +183,16 @@ class Node(dict):
                 single_parameters[attr.name] =float(res.value.value)
 
             elif res.value.type == 'timeseries' and metadata['single']== 'yes':
-                single_parameters[attr.name]=get_timesreies_values(res.value.value, attr.name, json.loads(res.value.metadata))
+                if 'column' in metadata.keys():
+                    single_parameters[attr.name] = get_timesreies_values(res.value.value, metadata['column'],
+                                                                         json.loads(res.value.metadata))
+                else:
+                    single_parameters[attr.name] = get_timesreies_values(res.value.value, attr.name,
+                                                                         json.loads(res.value.metadata))
 
             elif res.value.type == 'array' and metadata['single'] == 'yes':
                 single_parameters[attr.name] =json.loads (res.value.value)
+
         complex_attributes={}
         for attr_ in aggregated_attributes:
             attr = attributes_ids[attr_.attr_id]
@@ -176,31 +200,28 @@ class Node(dict):
             metadata = json.loads(res.value.metadata)
             if(metadata['type']=='controlcurveindex'):
                 complex_attributes[attr.name] =Controlcurveindex(attr, res, metadata, single_parameters)
-                #self.__dict__[attr.name] =Controlcurveindex(attr, res, metadata, single_parameters)
-                #attributes[attr.name] = self.__dict__[attr.name]
+
             elif (metadata['type']=='indexedarray'):
                 complex_attributes[attr.name] =Indexedarray(attr, res, metadata, single_parameters)
-                #self.__dict__[attr.name] =Indexedarray(attr, res, metadata, single_parameters)
-                #attributes[attr.name] = self.__dict__[attr.name]
+
             elif (metadata['type'] == 'aggregated'):
                 complex_attributes[attr.name] =Aggregated(attr, res, metadata, single_parameters)
-                #self.__dict__[attr.name] =Aggregated(attr, res, metadata, single_parameters)
-                #attributes[attr.name] = self.__dict__[attr.name]
+
             elif (metadata['type'] == 'ControlCurveInterpolated'):
                 complex_attributes[attr.name] =ControlCurveInterpolated(attr, res, metadata, single_parameters)
-                #self.__dict__[attr.name] =ControlCurveInterpolated(attr, res, metadata, single_parameters)
-                #attributes[attr.name] = self.__dict__[attr.name]
+
             elif (metadata['type'] == 'monthlyprofilecontrolcurve'):
                 complex_attributes[attr.name] =Monthlyprofilecontrolcurve(attr, res, metadata, single_parameters)
-                #self.__dict__[attr.name] =Monthlyprofilecontrolcurve(attr, res, metadata, single_parameters)
-                #attributes[attr.name] = self.__dict__[attr.name]
+
+            elif (metadata['type'] == 'recorderthreshold'):
+                complex_attributes[attr.name] = Recorderthreshold(attr, res, metadata, single_parameters)
+
 
         adjuest_parameters(complex_attributes)
 
         for item in complex_attributes.keys():
             self.__dict__[attr.name] =complex_attributes[item]
             attributes[attr.name] = self.__dict__[attr.name]
-
 
 
         for item in single_parameters.keys():
@@ -217,6 +238,7 @@ class Node(dict):
         nodes_parameters[self.name]=attributes
 
 def get_timesreies_values(value, column, metadata):
+
     if('type' in metadata.keys()):
         type_ = metadata['type']
     else:
@@ -226,9 +248,12 @@ def get_timesreies_values(value, column, metadata):
     vv = json.loads(value)
     contents=[]
     if(type_ == 'dailyprofile'):
-        contents.append('Index, ' + column + '\n')
+        contents.append('Index,' + column + '\n')
+    elif (type_ == 'dataframe'):
+        contents.append('Timestamp,' + 'Data' + '\n')
+
     else:
-        contents.append('Date, '+column+'\n')
+        contents.append('Date,'+column+'\n')
     day=1
     for key in vv.keys():
         for date in sorted(vv[key].keys()):
@@ -242,18 +267,33 @@ def get_timesreies_values(value, column, metadata):
                     day+=1
             else:
                 contents.append(date+','+str(vv[key][date])+'\n')
+    # in case of  dailyprofile, hydra save only 365 dats in a year while
+    # pywr required values for 356 days, so days 365 is repeated till fix that in hydar
+    if(type_ == "dailyprofile"):
+        contents.append(str(day) + ',' + str(vv[key][date]))
     if ('parse_dates' in metadata.keys()):
         if(metadata['parse_dates'].lower() == 'true'):
             values['parse_dates'] = True
         else:
             values['parse_dates']=False
 
+    if ('index_col' in metadata.keys()):
+        values['index_col'] = int(metadata['index_col'])
+
+    if ('dayfirst' in metadata.keys()):
+        values['dayfirst'] = metadata['dayfirst']
+
+
     values['type'] = type_
     values['url']=contents
-    values['column']=column
+    if(type_!='dataframe'):
+        values['column']=column
+
+
     return values
 
 def write_time_series_tofile(contents, filename):
+    print "File name ======>", filename
     file = open(filename, "w")
     file.write("".join(contents))
     file.close()
@@ -316,14 +356,25 @@ class Recorder(object):
                 self.type = value[0]
 
 def get_recotds(network, attributes_ids, resourcescenarios_ids):
-    recorders=[]
+    recorders={}
     for attr_ in network.attributes:
         attr = attributes_ids[attr_.attr_id]
         res = resourcescenarios_ids[attr_.id]
         if (attr.name == 'recorders'):
             values=json.loads(res.value.value)
+            metadata = json.loads(res.value.metadata)
             for value in values:
-                recorders.append(Recorder(value))
+                dic={}
+                recorders[value]=dic
+                for key in metadata.keys():
+                    if key.startswith(value+'@'):
+                        item=key.replace(value+'@','')
+                        if item =='timesteps':
+                            dic[item] = int(metadata[key])
+                        else:
+                            dic[item]=metadata[key]
+
+
     return recorders
 
 class Domain(object):
@@ -394,9 +445,11 @@ class PywrNetwork (object):
         self.domains=domains
         self.parameters=parameters
         self.recorders=recorders
+
     def get_json(self):
         json_string='{\n\"metadata\": '+json.dumps(get_dict(self.metadata), indent=4)+',\n'
-        json_string=json_string+'\"timestepper\": '+json.dumps(get_dict(self.timestepper), indent=4)+',\n'
+        if len(get_dict(self.timestepper)) > 0:
+            json_string=json_string+'\"timestepper\": '+json.dumps(get_dict(self.timestepper), indent=4)+',\n'
         json_string = json_string + '\"nodes\": '+json.dumps(get_dict(self.nodes), indent=4)+',\n'
         json_string = json_string + '\"edges\": ' + json.dumps(get_dict(self.edges), indent=4) + ',\n'
         if(len(self.domains)>0):
@@ -450,10 +503,9 @@ def get_parameters_refs(nodes):
     return  parameters
 
 def pywrwriter (network, attrlist, output_file):
-    #print network
+    json_file__folder=os.path.dirname(output_file)
     nodes=[]
     edges=[]
-    parameters=[]
     domains=[]
     attributes_ids={}
     for attr in attrlist:
@@ -489,9 +541,9 @@ def pywrwriter (network, attrlist, output_file):
             if (k.lower() != 'name' and k.lower() != 'type' and k.lower() != 'position'):
                 value=node.__dict__.values()[i]
                 if type(value) is dict:
-                    if value['type'] == 'arrayindexed' or value['type'] == 'dailyprofile':
+                    if value['type'] == 'arrayindexed' or value['type'] == 'dailyprofile' or value['type'] == 'dataframe':
                         file_name=node.name+"_"+k+'.csv'
-                        write_time_series_tofile(value['url'], file_name)
+                        write_time_series_tofile(value['url'], os.path.join(json_file__folder, file_name))
                         value['url']=file_name
     for k in parameters:
         value=parameters[k]
@@ -499,7 +551,7 @@ def pywrwriter (network, attrlist, output_file):
         if type(value) is dict and 'type' in value.keys():
             if value['type'] == 'arrayindexed' or value['type'] == 'dailyprofile':
                 file_name = node.name + "_" + k + '.csv'
-                write_time_series_tofile(value['url'], file_name)
+                write_time_series_tofile(value['url'], os.path.join(json_file__folder, file_name))
                 value['url'] = file_name
 
 

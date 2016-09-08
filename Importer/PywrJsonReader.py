@@ -1,3 +1,4 @@
+import os
 import json
 import jsonpickle
 import random
@@ -8,9 +9,11 @@ from datetime import timedelta
 import datetime
 import inspect
 
+
 recourseAttributea =[]
 ref_parameters={}
 
+json_file__folder=[]
 
 class Counter(object):
     def __init__(self):
@@ -130,9 +133,12 @@ class Network (object):
         self.project_id=project_id
         author=None
         if(metadata !=None):
-            self.name=metadata.title
-            self.description =metadata.description
-            author=metadata.author
+            if hasattr(metadata, "title"):
+                self.name=metadata.title
+            if hasattr(metadata, "description"):
+                self.description =metadata.description
+            if hasattr(metadata, "author"):
+                author=metadata.author
         else:
             self.name = name + '_' + str(datetime.datetime.now())
             self.description = "Pywr network"
@@ -155,23 +161,24 @@ class Network (object):
             self.attributes.append(ResourceAttr(counter.id, 'solver', 'Input'))
             recourseAttributea.append( RecourseAttribute('NETWORK', counter.id, 'solver', attributes_['solver'], 'Dimensionless'))
 
-        counter.id = counter.id - 1
-        attributes_['timestep'] = AttributeData('descriptor', str(timestepper.timestep), '-', 'Dimensionless')
-        self.attributes.append(ResourceAttr(counter.id, 'timestep', 'Input'))
-        recourseAttributea.append(
-            RecourseAttribute('NETWORK', counter.id, 'timestep', attributes_['timestep'], 'Dimensionless'))
+        if(timestepper!=None):
+            counter.id = counter.id - 1
+            attributes_['timestep'] = AttributeData('descriptor', str(timestepper.timestep), '-', 'Dimensionless')
+            self.attributes.append(ResourceAttr(counter.id, 'timestep', 'Input'))
+            recourseAttributea.append(
+                RecourseAttribute('NETWORK', counter.id, 'timestep', attributes_['timestep'], 'Dimensionless'))
 
-        counter.id = counter.id - 1
-        attributes_['start_time'] = AttributeData('descriptor', str(timestepper.start), '-', 'Dimensionless')
-        self.attributes.append(ResourceAttr(counter.id, 'start_time', 'Input'))
-        recourseAttributea.append(
-            RecourseAttribute('NETWORK', counter.id, 'start_time', attributes_['start_time'], 'Dimensionless'))
+            counter.id = counter.id - 1
+            attributes_['start_time'] = AttributeData('descriptor', str(timestepper.start), '-', 'Dimensionless')
+            self.attributes.append(ResourceAttr(counter.id, 'start_time', 'Input'))
+            recourseAttributea.append(
+                RecourseAttribute('NETWORK', counter.id, 'start_time', attributes_['start_time'], 'Dimensionless'))
 
-        counter.id = counter.id - 1
-        attributes_['end_time'] = AttributeData('descriptor', str(timestepper.end), '-', 'Dimensionless')
-        self.attributes.append(ResourceAttr(counter.id, 'end_time', 'Input'))
-        recourseAttributea.append(
-            RecourseAttribute('NETWORK', counter.id, 'end_time', attributes_['end_time'], 'Dimensionless'))
+            counter.id = counter.id - 1
+            attributes_['end_time'] = AttributeData('descriptor', str(timestepper.end), '-', 'Dimensionless')
+            self.attributes.append(ResourceAttr(counter.id, 'end_time', 'Input'))
+            recourseAttributea.append(
+                RecourseAttribute('NETWORK', counter.id, 'end_time', attributes_['end_time'], 'Dimensionless'))
 
 
         domain_list=[]
@@ -186,18 +193,15 @@ class Network (object):
                 RecourseAttribute('NETWORK', counter.id, 'domains', attributes_['domains'], 'Dimensionless'))
 
         recorders_list=[]
+        metadata_={}
         for recorder in recorders:
-            r_list=[]
-            recorders_list.append(r_list)
-            r_list.append(recorder.type)
-            if hasattr(recorder, "recorders") and hasattr(recorder, "agg_func"):
-                r_list.append(json.dumps(recorder.recorders))
-                r_list.append(recorder.agg_func)
-            else:
-                r_list.append(recorder.node)
-
+            dic=get_dict(recorder)
+            recorders_list.append(recorder.name)
+            for k in dic.keys():
+                if(k !='name'):
+                    metadata_[recorder.name+'@'+k]=str(dic[k])
         counter.id = counter.id - 1
-        attributes_['recorders'] = AttributeData('array', json.dumps(recorders_list), '-', 'Dimensionless')
+        attributes_['recorders'] = AttributeData('array', json.dumps(recorders_list), '-', 'Dimensionless', metadata_)
         self.attributes.append(ResourceAttr(counter.id, 'recorders', 'Input'))
         recourseAttributea.append(
             RecourseAttribute('NETWORK', counter.id, 'recorders', attributes_['recorders'], 'Dimensionless'))
@@ -205,7 +209,7 @@ class Network (object):
 
 class Scenario(object):
     def __init__(self):
-        self.description="Created by Pywr exporter"
+        self.description="Created by PywrApp"
         self.name="scenarion_" + str(datetime.datetime.now())
         self.resourcescenarios=[]
 
@@ -229,7 +233,21 @@ class AttributeData (object):
             self.metadata =json.dumps(metadata)
         self.value=value
 
+class Recorder(object):
+    def __init__(self, name, record_):
+        self.type = record_['type']
+        self.name=name
+        if "recorders" in record_.keys():
+            self.recorders=record_['recorders']
+            self.agg_func=record_['agg_func']
+        else:
+            self.node=record_['node']
+        if "timesteps" in record_.keys():
+            self.timesteps=record_['timesteps']
+        if  "comment" in record_.keys():
+            self.comment = record_['comment']
 
+'''
 class Recorder(object):
     def __init__(self, record_):
         self.type = record_.type
@@ -238,7 +256,12 @@ class Recorder(object):
             self.agg_func=record_.agg_func
         else:
             self.node=record_.node
+        if hasattr(record_, "timesteps"):
+            self.timesteps=record_.timesteps
+        if hasattr(record_, "comment"):
+            self.comment = record_.comment
 
+'''
 class Domain (object):
     def __init__(self, domain_):
         self.name=domain_.name
@@ -255,7 +278,7 @@ def get_timeseriesdates(timestepper):
         start = start + timedelta(days=timestep)
 
 def read_data_file(url, column=None):
-    with open(url) as f:
+    with open(os.path.join(url)) as f:
         content = f.read().splitlines()
     head = content[0].split(',')
     if column is not None:
@@ -274,6 +297,10 @@ def read_data_file(url, column=None):
     return content, date_index, value_index
 
 def read_timeseries(url, column=None):
+    ss= os.path.dirname(url)
+    if(ss == ''):
+        url=os.path.join(json_file__folder[0], url)
+
     content, date_index, value_index=read_data_file(url, column)
     values={}
     for i in range (1, len(content)):
@@ -289,10 +316,14 @@ def read_seasonall(values_):
     day = 1
     #check if the data is saved on file
     if hasattr(values_, 'url'):
+        url=values_.url
+        ss = os.path.dirname(url)
+        if (ss == ''):
+            url = os.path.join(json_file__folder[0], url)
         if hasattr(values_, 'column'):
-            content, date_index, value_index = read_data_file(values_.url, values_.column)
+            content, date_index, value_index = read_data_file(url, values_.column)
         else:
-            content, date_index, value_index = read_data_file(values_.url)
+            content, date_index, value_index = read_data_file(url)
         for i in range(1, len(content)):
             lin = content[i].split(',')
             ss=int (lin[date_index])
@@ -351,15 +382,23 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
             if value_.type.lower() =='constant':
                 value = str(value_.values)
                 type = 'scalar'
-            elif value_.type.lower() == "arrayindexed":
+            elif value_.type.lower() == "arrayindexed" or value_.type.lower() == "dataframe":
                 type = 'timeseries'
-                metadata['type'] = 'arrayindexed'
+                metadata['type'] = value_.type
                 if hasattr(value_, "column"):
+
                     value = read_timeseries(value_.url, value_.column)
                     metadata['column']=value_.column
                 else:
                     value = read_timeseries(value_.url)
-            elif value_.type.lower()== "monthlyprofile" or value_.type.lower()== "dailyprofile":
+                if hasattr(value_, "parse_dates"):
+                    metadata['parse_dates'] = str(value_.parse_dates)
+                if hasattr(value_, "index_col"):
+                    metadata['index_col'] = str(value_.index_col)
+                if hasattr(value_, "dayfirst"):
+                    metadata['dayfirst'] = str(value_.dayfirst)
+
+            elif value_.type.lower()== "monthlyprofile" or value_.type.lower()== "dailyprofile" :
                 type = 'timeseries'
                 metadata['type']=value_.type
                 value = read_seasonall(value_)
@@ -383,6 +422,11 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
             elif value_.type.lower() == 'controlcurveinterpolated':
                 get_controlcurveinterpolated_attributes(value_, name, counter, attributes_, _type, res_attributes)
                 return
+            elif value_.type.lower() == 'recorderthreshold':
+                get_recorderthreshold(value_, name, counter, attributes_, _type, res_attributes)
+                return
+
+
 
 
     if hasattr(value_, "comment"):
@@ -483,11 +527,30 @@ def get_monthlyprofilecontrolcurve_attributes(value_, name, counter, attributes_
     get_attribute_type_and_value(value_.values, name + '_values', counter, attributes_, _type, res_attributes)
     counter.id = counter.id - 1
     attr = AttributeData(type, json.dumps(values_list), '-', 'Dimensionless', metadata)
-
     attributes_[name] = attr
     if (res_attributes != None):
         res_attributes.append(ResourceAttr(counter.id, name, _type))
         recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
+
+def get_recorderthreshold(value_, name, counter, attributes_, _type, res_attributes):
+    type = 'array'
+    metadata = {}
+    metadata['single'] = 'no'
+    metadata['type'] = 'recorderthreshold'
+    if hasattr(value_, "comment"):
+        metadata['comment'] = value_.comment
+    metadata['recorder']=value_.recorder
+    metadata['threshold']=str(value_.threshold)
+    metadata['predicate']=value_.predicate
+    value=value_.values
+    counter.id = counter.id - 1
+    attr = AttributeData(type, json.dumps(value), '-', 'Dimensionless', metadata)
+    attributes_[name] = attr
+    if (res_attributes != None):
+        res_attributes.append(ResourceAttr(counter.id, name, _type))
+        recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
+
+
 
 def get_controlcurveinterpolated_attributes(value_, name, counter, attributes_, _type, res_attributes):
     type = 'array'
@@ -496,12 +559,18 @@ def get_controlcurveinterpolated_attributes(value_, name, counter, attributes_, 
     metadata['type']='ControlCurveInterpolated'
     if hasattr(value_, "comment"):
         metadata['comment'] = value_.comment
+
+    if hasattr(value_, "storage_node"):
+        metadata['storage_node'] = value_.storage_node
+
     control_curve=value_.control_curve
     get_attribute_type_and_value(control_curve, name + 'control_curve', counter, attributes_, _type, res_attributes)
     counter.id = counter.id - 1
+    value= value_.values
 
-    val=[name + 'control_curve']
-    attr = AttributeData(type, json.dumps(val), '-', 'Dimensionless', metadata)
+    metadata['control_curve']=name + 'control_curve'
+
+    attr = AttributeData(type, json.dumps(value), '-', 'Dimensionless', metadata)
 
     attributes_[name] = attr
     if (res_attributes != None):
@@ -534,7 +603,8 @@ def get_dict(obj):
         result[key] = element
     return result
 
-def export (filename, connector):
+def import_net (filename, connector):
+        json_file__folder.append(os.path.dirname(filename))
         counter=Counter()
         recorders=[]
         domains=[]
@@ -557,7 +627,9 @@ def export (filename, connector):
             json_string += line
         f.close()
         x = json.loads(json_string, object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
-        timeseries=get_timeseriesdates(x.timestepper)
+        timeseries=None
+        if hasattr(x, "timestepper"):
+            timeseries=get_timeseriesdates(x.timestepper)
         project=Project()
 
         request=jsonpickle.dumps(project).replace("/","_").replace("\"", '\'')
@@ -565,21 +637,28 @@ def export (filename, connector):
         Proj = connector.call('add_project', {'project': project.__dict__})
 
         if hasattr(x, "recorders"):
-            for recorder_ in x.recorders:
-                recorders.append(Recorder(recorder_))
+            rcds=get_dict(x.recorders)
+            for name in rcds.keys():
+
+                recorders.append(Recorder(name, rcds[name]))
         if hasattr(x, "domains"):
             for domain_ in x.domains:
                 domains.append(Domain(domain_))
 
-        if hasattr(x, "metadata") and hasattr(x, "solver"):
-            network = Network('Pywr', x.solver.name, Proj.id, counter, domains, recorders, network_attributes,
-                              x.timestepper, x.metadata)
-        elif hasattr(x, "solver"):
-            network = Network('Pywr', x.solver.name, Proj.id, counter, domains, recorders, network_attributes,
-                              x.timestepper)
+        timestepper=None
+        if hasattr(x, "timestepper"):
+            timestepper = x.timestepper
+
+        solver_name=None
+        if hasattr(x, "solver"):
+            solver_name=x.solver
+
+        if hasattr(x, "metadata"):
+            network = Network('Pywr',solver_name, Proj.id, counter, domains, recorders, network_attributes,
+                              timestepper, x.metadata)
         else:
-            network = Network('Pywr', None, Proj.id, counter, domains, recorders, network_attributes,
-                              x.timestepper)
+            network = Network('Pywr', solver_name, Proj.id, counter, domains, recorders, network_attributes,
+                              timestepper)
 
         for attr_name in network_attributes[network.name].keys():
             if (attr_name in project_attributes):
