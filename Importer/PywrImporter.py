@@ -56,18 +56,31 @@ class HydraConnector(JSONPlugin):
 
 
 if __name__ == '__main__':
-        message=""
-   # try:
+    message=""
+    steps=6
+    write_progress(1, steps)
+
+    try:
         parser = commandline_parser()
+        write_progress(2, steps)
+
 
         args = parser.parse_args()
+        write_progress(3, steps)
+
         connector=HydraConnector(args)
+        write_progress(4, steps)
 
         network=import_net(args.json_file, connector.connection)
+        write_progress(5, steps)
+
         text = PluginLib.create_xml_response('Pywr importer', (network.id), [network.scenarios[0].id],
                                              message="Data import was successful.",
                                              errors=[])
-  #  except Exception, e:
-   #     error = [e.message]
-   #     text = PluginLib.create_xml_response('Pywr importer', "", "", message="Error while importing data",errors=error)
-        print text
+    except Exception, e:
+        error = [e.message]
+        text = PluginLib.create_xml_response('Pywr importer', "", "", message="Error while importing data",errors=error)
+
+    write_progress(6, steps)
+
+    print text

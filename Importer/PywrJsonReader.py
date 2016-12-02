@@ -58,7 +58,7 @@ class RecourseAttribute (object):
         self.value=value_
 
 class Node(object):
-    def __init__(self, node_, counter, nodes_attributes):
+    def __init__(self, node_, counter, nodes_attributes, recorders):
         attributes_ = {}
         self.attributes = []
         ras = []
@@ -69,6 +69,12 @@ class Node(object):
         self.status = "A"
         self.name = node_.name
         self.type = node_.type
+        for recorder in recorders:
+            dict=get_dict(recorder)
+            if('node' in dict.keys()):
+                del dict["node"]
+            del dict['name']
+            get_variable_attribute_type_and_value('NULL', recorder.name, counter, attributes_, 'output', dict, self.attributes)
         self.description = ""
         if hasattr(node_, "position"):
             if hasattr(node_.position, "position"):
@@ -93,10 +99,10 @@ class Node(object):
             k=node_.__dict__.keys()[i]
             if(k.lower() != 'name' and k.lower() !='type' and k.lower() !='position'):
                 val=node_.__dict__.values()[i]
-                get_attribute_type_and_value(val, k, counter, attributes_, self.type, self.attributes)
+                get_attribute_type_and_value(val, k, counter, attributes_, 'input', self.attributes)
 
 
-        get_attribute_type_and_value(node_.type, 'node_type', counter, attributes_, self.type, self.attributes)
+        get_attribute_type_and_value(node_.type, 'node_type', counter, attributes_, 'input', self.attributes)
         nodes_attributes [self.name]= attributes_
 
 class Link(object):
@@ -132,6 +138,7 @@ class Network (object):
         attributes_={}
         self.project_id=project_id
         author=None
+        minimum_version=None
         if(metadata !=None):
             if hasattr(metadata, "title"):
                 self.name=metadata.title
@@ -139,6 +146,8 @@ class Network (object):
                 self.description =metadata.description
             if hasattr(metadata, "author"):
                 author=metadata.author
+            if hasattr(metadata, "minimum_version"):
+                minimum_version = metadata.minimum_version
         else:
             self.name = name + '_' + str(datetime.datetime.now())
             self.description = "Pywr network"
@@ -154,6 +163,13 @@ class Network (object):
             attributes_['author'] = AttributeData('descriptor', author, '-', 'Dimensionless')
             self.attributes.append(ResourceAttr(counter.id, 'author', 'Input'))
             recourseAttributea.append(RecourseAttribute('NETWORK', counter.id, 'author', attributes_['author'], 'Dimensionless'))
+
+        if minimum_version is not None:
+            counter.id = counter.id - 1
+            attributes_['minimum_version'] = AttributeData('descriptor', minimum_version, '-', 'Dimensionless')
+            self.attributes.append(ResourceAttr(counter.id, 'minimum_version', 'Input'))
+            recourseAttributea.append(
+                RecourseAttribute('NETWORK', counter.id, 'minimum_version', attributes_['minimum_version'], 'Dimensionless'))
 
         if(solver_name != None):
             counter.id = counter.id - 1
@@ -201,10 +217,10 @@ class Network (object):
                 if(k !='name'):
                     metadata_[recorder.name+'@'+k]=str(dic[k])
         counter.id = counter.id - 1
-        attributes_['recorders'] = AttributeData('array', json.dumps(recorders_list), '-', 'Dimensionless', metadata_)
-        self.attributes.append(ResourceAttr(counter.id, 'recorders', 'Input'))
-        recourseAttributea.append(
-            RecourseAttribute('NETWORK', counter.id, 'recorders', attributes_['recorders'], 'Dimensionless'))
+       # attributes_['recorders'] = AttributeData('array', json.dumps(recorders_list), '-', 'Dimensionless', metadata_)
+       # self.attributes.append(ResourceAttr(counter.id, 'recorders', 'Input'))
+       # recourseAttributea.append(
+          #  RecourseAttribute('NETWORK', counter.id, 'recorders', attributes_['recorders'], 'Dimensionless'))
         network_attributes[self.name] = attributes_
 
 class Scenario(object):
@@ -240,7 +256,7 @@ class Recorder(object):
         if "recorders" in record_.keys():
             self.recorders=record_['recorders']
             self.agg_func=record_['agg_func']
-        else:
+        if("node" in record_.keys()):
             self.node=record_['node']
         if "timesteps" in record_.keys():
             self.timesteps=record_['timesteps']
@@ -347,6 +363,21 @@ def read_seasonall(values_):
                 day+=1
     return json.dumps({'0': values})
 
+
+def get_variable_attribute_type_and_value(value_, name, counter, attributes_, _type, metadata_, res_attributes=None):
+    value = value_
+    type = 'descriptor'
+    metadata={}
+    for key in metadata_.keys():
+        metadata[key]=str(metadata_[key])
+
+    counter.id = counter.id - 1
+    attributes_[name] = AttributeData(type, value, '-', 'Dimensionless', metadata)
+    if (res_attributes != None):
+        res_attributes.append(ResourceAttr(counter.id, name, _type))
+        recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
+
+
 def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_attributes=None):
     metadata = {}
     metadata['single'] = 'yes'
@@ -425,9 +456,6 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
             elif value_.type.lower() == 'recorderthreshold':
                 get_recorderthreshold(value_, name, counter, attributes_, _type, res_attributes)
                 return
-
-
-
 
     if hasattr(value_, "comment"):
         metadata['comment']=value_.comment
@@ -678,7 +706,13 @@ def import_net (filename, connector):
                 get_attribute_type_and_value(x.parameters.__dict__.values()[i], k, counter, ref_parameters, 'default')
 
         for node_ in x.nodes:
-            node = Node(node_, counter, nodes_attributes)
+            node_records=[]
+            for rec in recorders:
+                 if hasattr(rec, "node"):
+                    if rec.node==node_.name:
+                         node_records.append(rec)
+
+            node = Node(node_, counter, nodes_attributes, node_records)
             nodes_ids[node_.name] = node.id
             counter.id = counter.id - 1
             network.nodes.append(node)

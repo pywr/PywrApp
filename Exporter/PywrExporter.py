@@ -83,14 +83,16 @@ class PywrExporter(JSONPlugin):
 if __name__ == '__main__':
     errors  = []
     steps=7
-    steps=7
     try:
         write_progress(1, steps)
         parser = commandline_parser()
         args = parser.parse_args()
         check_args(args)
+        write_progress(2, steps)
         pywrexporter=PywrExporter(args)
-        pywrwriter(pywrexporter.net, pywrexporter.attrlist, args.output)
+        write_progress(3, steps)
+        pywrwriter(pywrexporter.net, pywrexporter.attrlist, args.output, steps)
+
         text = PluginLib.create_xml_response('Pywr Exporter', (args.network_id), [args.scenario_id],
                                              message="Data export was successful.",
                                              errors=errors)
@@ -112,7 +114,10 @@ if __name__ == '__main__':
         text = PluginLib.create_xml_response('Pywr Exporter', (args.network_id), [args.scenario_id],
                                              message="Error while exporting data.",
                                              errors=errors)
+    write_progress(steps, steps)
     print text
+
+
 
 
 

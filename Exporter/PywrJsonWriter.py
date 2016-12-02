@@ -8,11 +8,11 @@ from datetime import timedelta
 import datetime
 import inspect
 import os
-
+from HydraLib.PluginLib import write_progress, write_output
 nodes_parameters = {}
 
 parameters = {}
-
+recorders={}
 class Recorderthreshold (object):
     def __init__(self, attr, res, metadata, single_parameters):
         to_be_deleted=[]
@@ -165,6 +165,23 @@ class Node(dict):
         aggregated_attributes=[]
         geographic=None
         for attr_ in node_.attributes:
+            if attr_.attr_is_var == 'Y':
+                attr = attributes_ids[attr_.attr_id]
+                res = resourcescenarios_ids[attr_.id]
+                metadata = json.loads(res.value.metadata)
+                dic={}
+                recorders[attr.name] =dic
+                dic["node"]=node_.name
+                for key in metadata.keys():
+                    if key=="user_id":
+                        continue
+
+                    if key == 'timesteps':
+                        dic[key] = int(metadata[key])
+                    else:
+                        dic[key] = metadata[key]
+
+                continue
             attr=attributes_ids[attr_.attr_id]
             res=resourcescenarios_ids[attr_.id]
             metadata = json.loads(res.value.metadata)
@@ -356,7 +373,6 @@ class Recorder(object):
                 self.type = value[0]
 
 def get_recotds(network, attributes_ids, resourcescenarios_ids):
-    recorders={}
     for attr_ in network.attributes:
         attr = attributes_ids[attr_.attr_id]
         res = resourcescenarios_ids[attr_.id]
@@ -373,7 +389,6 @@ def get_recotds(network, attributes_ids, resourcescenarios_ids):
                             dic[item] = int(metadata[key])
                         else:
                             dic[item]=metadata[key]
-
 
     return recorders
 
@@ -410,6 +425,8 @@ class Metadata (object):
            res = resourcescenarios_ids[attr_.id]
            if (attr.name == 'author'):
                self.author = res.value.value
+           if (attr.name == 'minimum_version'):
+               self.minimum_version = res.value.value
        self.description=network.description
 
 def get_dict(obj):
@@ -474,6 +491,7 @@ def get_parameters_refs(nodes):
             for attr in attrs.keys():
                 for attr_ in attrs_.keys():
                     if(attr==attr_):
+                        print attr
                         if hasattr(attrs[attr], "type") and hasattr(attrs_[attr_],'type'):
                             if attrs[attr] ['type']== attrs_[attr_]['type']:
                                 if(attrs[attr] ['type']=='arrayindexed'):
@@ -491,7 +509,8 @@ def get_parameters_refs(nodes):
                         else:
                             if attrs[attr] == attrs_[attr_]:
                                 if(not attr+'_ref' in parameters ):
-                                    parameters[attr+'_ref' ]=attrs[attr]
+                                    print "======================>",attrs[attr], attr
+                                    parameters[attr+'_ref' ]= {"type": "constant","values": attrs[attr]}
 
     for node in nodes:
         for key in node.__dict__.keys():
@@ -502,8 +521,10 @@ def get_parameters_refs(nodes):
 
     return  parameters
 
-def pywrwriter (network, attrlist, output_file):
+def pywrwriter (network, attrlist, output_file, steps):
     json_file__folder=os.path.dirname(output_file)
+    write_progress(4, steps)
+
     nodes=[]
     edges=[]
     domains=[]
@@ -513,7 +534,8 @@ def pywrwriter (network, attrlist, output_file):
     resourcescenarios_ids=get_resourcescenarios_ids(network.scenarios[0].resourcescenarios)
     timestepper=Timestepper(network, attributes_ids, resourcescenarios_ids)
     metadata = Metadata(network, resourcescenarios_ids, attributes_ids)
-    recorders=get_recotds(network, attributes_ids, resourcescenarios_ids)
+    #get_recotds(network, attributes_ids, resourcescenarios_ids)
+    #get_recotds(network, attributes_ids, resourcescenarios_ids)
     domains=[]
     for attr_ in network.attributes:
         attr = attributes_ids[attr_.attr_id]
@@ -530,7 +552,8 @@ def pywrwriter (network, attrlist, output_file):
         node=Node(node_, attributes_ids, resourcescenarios_ids)
         nodes_id_name[node_.id]=node_.name
         nodes.append(node)
-    parameters=get_parameters_refs(nodes,)
+    #need to be done check parameters refs for the new pywr format
+    parameters=get_parameters_refs(nodes)
 
     for link_ in network.links:
         edge=Edge(link_, attributes_ids, resourcescenarios_ids, nodes_id_name)
@@ -553,9 +576,10 @@ def pywrwriter (network, attrlist, output_file):
                 file_name = node.name + "_" + k + '.csv'
                 write_time_series_tofile(value['url'], os.path.join(json_file__folder, file_name))
                 value['url'] = file_name
-
+    write_progress(5, steps)
 
     pywrNetwork=PywrNetwork(metadata, timestepper, solver, nodes, edges, domains, parameters,  recorders)
+    write_progress(6, steps)
     with open(output_file, "w") as text_file:
         text_file.write(pywrNetwork.get_json())
 
