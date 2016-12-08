@@ -13,6 +13,8 @@ nodes_parameters = {}
 
 parameters = {}
 recorders={}
+
+has_tablerecorder=False
 class Recorderthreshold (object):
     def __init__(self, attr, res, metadata, single_parameters):
         to_be_deleted=[]
@@ -159,6 +161,7 @@ def adjuest_parameters(complex_attrinbtes):
 
 class Node(dict):
     def __init__(self, node_, attributes_ids, resourcescenarios_ids):
+        global has_tablerecorder
         self.name=node_.name
         single_parameters={}
         attributes={}
@@ -167,6 +170,8 @@ class Node(dict):
         for attr_ in node_.attributes:
             if attr_.attr_is_var == 'Y':
                 attr = attributes_ids[attr_.attr_id]
+                if has_tablerecorder == True and attr.name=='mean_flow':
+                    continue
                 res = resourcescenarios_ids[attr_.id]
                 metadata = json.loads(res.value.metadata)
                 dic={}
@@ -306,7 +311,6 @@ def get_timesreies_values(value, column, metadata):
     if(type_!='dataframe'):
         values['column']=column
 
-
     return values
 
 def write_time_series_tofile(contents, filename):
@@ -374,19 +378,20 @@ class Recorder(object):
                 self.type = value[0]
 
 def get_recotds(network, attributes_ids, resourcescenarios_ids):
+    global has_tablerecorder
     for attr_ in network.attributes:
         attr = attributes_ids[attr_.attr_id]
         res = resourcescenarios_ids[attr_.id]
-        print "Toz:   ", attr.name
         if (attr.name == 'recorder'):
             value=res.value.value
             metadata = json.loads(res.value.metadata)
-            print "MetaData =================>", metadata
             dic={}
             recorders[value]=dic
             for key in metadata.keys():
                 if(key!="user_id"):
                   dic[key]=metadata[key]
+
+            has_tablerecorder=True
     #return recorders
 
 class Domain(object):
@@ -488,7 +493,6 @@ def get_parameters_refs(nodes):
             for attr in attrs.keys():
                 for attr_ in attrs_.keys():
                     if(attr==attr_):
-                        print attr
                         if hasattr(attrs[attr], "type") and hasattr(attrs_[attr_],'type'):
                             if attrs[attr] ['type']== attrs_[attr_]['type']:
                                 if(attrs[attr] ['type']=='arrayindexed'):
@@ -497,16 +501,12 @@ def get_parameters_refs(nodes):
                                             parameters[attr] = {'type': attrs[attr]['type'],
                                                             'url': attrs_[attr_]['url']}
                                 else:
-                                    print attrs[attr]['values']
-                                    print attrs_[attr_]['values']
-                                    print 'Compare->: ', (set(attrs[attr]['values']) & set(attrs_[attr_]['values']))
                                     if attrs[attr]['values'] == attrs_[attr_]['values']:
                                         if (not attr+'_ref' in parameters):
                                             parameters[attr]={'type': attrs[attr] ['type'], 'values':attrs_[attr_]['values']}
                         else:
                             if attrs[attr] == attrs_[attr_]:
                                 if(not attr+'_ref' in parameters ):
-                                    print "======================>",attrs[attr], attr
                                     parameters[attr+'_ref' ]= {"type": "constant","values": attrs[attr]}
 
     for node in nodes:

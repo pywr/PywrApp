@@ -13,6 +13,8 @@ import inspect
 recourseAttributea =[]
 ref_parameters={}
 
+has_tablerecorder=False
+
 json_file__folder=[]
 
 class Counter(object):
@@ -59,6 +61,8 @@ class RecourseAttribute (object):
 
 class Node(object):
     def __init__(self, node_, counter, nodes_attributes, recorders):
+        global  has_tablerecorder
+        is_flow=True
         attributes_ = {}
         self.attributes = []
         ras = []
@@ -74,6 +78,8 @@ class Node(object):
             if('node' in dict.keys()):
                 del dict["node"]
             del dict['name']
+            if recorder.name=='flow':
+                is_flow=False
             get_variable_attribute_type_and_value('NULL', recorder.name, counter, attributes_, 'output', dict, self.attributes)
         self.description = ""
         if hasattr(node_, "position"):
@@ -99,7 +105,11 @@ class Node(object):
             k=node_.__dict__.keys()[i]
             if(k.lower() != 'name' and k.lower() !='type' and k.lower() !='position'):
                 val=node_.__dict__.values()[i]
+                if k=='flow':
+                    is_flow=False
                 get_attribute_type_and_value(val, k, counter, attributes_, 'input', self.attributes)
+        if is_flow == True and has_tablerecorder==True:
+            get_variable_attribute_type_and_value('NULL', 'mean_flow', counter, attributes_, 'output', {}, self.attributes)
 
 
         get_attribute_type_and_value(node_.type, 'node_type', counter, attributes_, 'input', self.attributes)
@@ -135,6 +145,7 @@ class Link(object):
 
 class Network (object):
     def __init__(self, name, solver_name, project_id, counter, domains, recorders, network_attributes, timestepper,  metadata=None):
+        global has_tablerecorder
         attributes_={}
         self.project_id=project_id
         author=None
@@ -216,8 +227,6 @@ class Network (object):
         for recorder in recorders:
                 if recorder.name.lower().strip()=="database" and not hasattr(recorder, "node"):
                     dic=get_dict(recorder)
-                    print "Found database =================> "
-                    print dic
                     metadata={}
                     for key in dic:
                         if key!="name":
@@ -232,6 +241,7 @@ class Network (object):
                     attributes_['recorder'] = AttributeData("descriptor", "database", '-', 'Dimensionless', metadata)
                     self.attributes.append(ResourceAttr(counter.id, "recorder", 'Input'))
                     recourseAttributea.append(RecourseAttribute('NETWORK', counter.id, 'recorder', attributes_['recorder'], 'Dimensionless'))
+                    has_tablerecorder=True
         network_attributes[self.name] = attributes_
 
 class Scenario(object):
@@ -322,7 +332,6 @@ def read_data_file(url, column=None):
         content = f.read().splitlines()
         head = content[0].split(',')
     if column is not None:
-        print "It is not none ...."
         for i in range(0, len(head)):
             if (head[i].strip().lower() == 'date' or head[i].strip().lower() == 'index'):
                 date_index = i
@@ -343,7 +352,6 @@ def read_timeseries(url, column=None):
         url=os.path.join(json_file__folder[0], url)
 
     content, date_index, value_index=read_data_file(url, column)
-    print column, date_index, value_index
     values={}
     date_format = "%d/%m/%Y"
     for i in range (1, len(content)):
@@ -663,6 +671,7 @@ def get_dict(obj):
     return result
 
 def import_net (filename, connector):
+        has_tablerecorder = False
         json_file__folder.append(os.path.dirname(filename))
         counter=Counter()
         recorders=[]
@@ -690,11 +699,8 @@ def import_net (filename, connector):
         if hasattr(x, "timestepper"):
             timeseries=get_timeseriesdates(x.timestepper)
         project=Project()
-
         request=jsonpickle.dumps(project).replace("/","_").replace("\"", '\'')
-
         Proj = connector.call('add_project', {'project': project.__dict__})
-
         if hasattr(x, "recorders"):
             rcds=get_dict(x.recorders)
             for name in rcds.keys():

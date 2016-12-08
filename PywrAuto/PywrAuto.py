@@ -23,7 +23,7 @@ if api_path not in sys.path:
     sys.path.insert(0, api_path)
 
 
-from PywrJsonWriter import pywrwriter
+from PywrJsonWriter import pywrwriter, get_dict
 
 from PywrJsonWriter import get_resourcescenarios_ids
 
@@ -91,7 +91,7 @@ def check_args(args):
 class varaiable_record(object):
     def __init__(self, rec_name, res, value, start_date, end_date, time_step):
         self.values = {}
-        start_date=prs. parse(start_date)
+        start_date=prs.parse(start_date)
         end_date =prs.parse(end_date)
         self.rec_name = rec_name
         self.res=res
@@ -163,7 +163,10 @@ def run_pywr_model(file_name):
     proc = subprocess.Popen(cmd)
     proc.wait()
 
+
+
 def import_results(results_file):
+    csvfile=None
     varaiables_records=[]
     with open(results_file, 'r') as res:
         results = res.read()
@@ -178,25 +181,53 @@ def import_results(results_file):
             end_date=line[1]
         elif line[0]=="timeStep":
             timeStep=line[1]
+
         else:
             rec_name=line[0]
-            res=line[1]
-            if len(line)==3:
-                value=line[2]
+            rec_type=line[1]
+            res=line[2]
+            if len(line)==4:
+                value=line[3]
             else:
                 value=[]
-                for j in range (2, len(line)):
+                for j in range (3, len(line)):
                     value.append(line[j])
-            var=varaiable_record(rec_name, res, value, start_date, end_date, timeStep)
+            if rec_name=="rec_name":
+                continue
+
+
+            if rec_type=="csvrecorder":
+                csvfile=res
+                get_csvrecorder_varaiables(csvfile, varaiables_records, start_date, end_date, timeStep)
+                continue
+
+
+            var = varaiable_record(rec_name, res, value, start_date, end_date, timeStep)
+
             varaiables_records.append(var)
     return varaiables_records
 
+
+def get_csvrecorder_varaiables(csvfile, varaiables_records, start_date, end_date, timeStep):
+
+    with open(csvfile, 'r') as res:
+        contents_ = res.read()
+    contents=contents_.split('\n')
+    header=contents[0].split(',')
+    for i in range(1, len(header)):
+        res_name=header[i]
+        values=[]
+        for j in range(1, len(contents)-1):
+            line=contents[j].split(',')
+            values.append(line[i])
+
+        var = varaiable_record('mean_flow', res_name, values, start_date, end_date, timeStep)
+        varaiables_records.append(var)
 
 def import_vars(network, varaiables_records, attrlist):
     attrs = dict()
     nodes_recodres={}
     resourcescenarios_ids=get_resourcescenarios_ids(network.scenarios[0].resourcescenarios)
-
     for attr in attrlist:
         attrs.update({attr.id: attr.name})
     attributes_ids = {}
@@ -216,7 +247,6 @@ def import_vars(network, varaiables_records, attrlist):
                             res = resourcescenarios_ids[attr_.id]
                             metadata = json.loads(res.value.metadata)
                             dataset = dict(name='Pywr import - ' + varaiable_record.rec_name, )
-
                             dataset['unit'] = '-'
                             dataset['type'] = varaiable_record.type
                             dataset['metadata'] = json.dumps(metadata)
@@ -227,8 +257,6 @@ def import_vars(network, varaiables_records, attrlist):
                                             value=dataset)
                             res_scenario.append(res_scen)
         network.scenarios[0].resourcescenarios = res_scenario
-
-
 
 def save(network, connection):
     connection.call('update_scenario', {'scen': network.scenarios[0]})

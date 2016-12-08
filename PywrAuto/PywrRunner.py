@@ -10,9 +10,9 @@ pandas.set_option("precision", 3)
 
 def load_model(file_name):
     model = Model.load(file_name)
-    start= pandas.to_datetime(model.timestepper.start)
-    end= pandas.to_datetime(model.timestepper.end)
-    timeStep= ((model.timestepper.delta))
+    #start= pandas.to_datetime(model.timestepper.start)
+    #end= pandas.to_datetime(model.timestepper.end)
+    #timeStep= ((model.timestepper.delta))
     # check the model is OK
     model.check()
     model.run()
@@ -23,19 +23,31 @@ def load_model(file_name):
         file.write("start_date,"+str(start_date)+'\n')
         file.write("end_date," + str(end_date)+ '\n')
         file.write("timeStep," + str(timeStep) + '\n')
-        file.write("rec_name, node name, type, value/s\n")
+        file.write("rec_name, rec_type, res name, type, value/s\n")
         for record in model.recorders:
-            file.write (record.name+','+record.node.name)
-            for items in record.data:
-                _type=items.__class__.__name__
-                if _type=="ndarray":
-                    for item in items:
-                        file.write ("," + str(item))
-                else:
-                    file.write("," + str(items) )
-            file.write('\n')
-            scenario = 0
-            timestep = 0
+            if hasattr(record, "csvfile"):
+                '''
+                if hasattr(record, 'node_names'):
+                    line = record.name+ ",csvrecorder"
+                    for node_name in record.node_names:
+                        line = line + ',' + node_name
+                    file.write(line)
+                '''
+                file.write(record.name+ ",csvrecorder,"+record.csvfile+"\n")
+            else:
+                if hasattr(record, 'node'):
+                    file.write (record.name+',single_recorder,'+record.node.name)
+                if hasattr(record, 'data'):
+                    for items in record.data:
+                        _type=items.__class__.__name__
+                        if _type=="ndarray":
+                            for item in items:
+                                file.write ("," + str(item))
+                        else:
+                            file.write("," + str(items))
+                file.write('\n')
+                #scenario = 0
+                #timestep = 0
     file.close()
 
 
