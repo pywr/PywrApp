@@ -3,7 +3,7 @@ import json
 import jsonpickle
 import random
 from collections import namedtuple
-from dateutil.parser import parse
+from dateutil.parser import parse as prs
 from datetime import datetime
 from datetime import timedelta
 import datetime
@@ -196,6 +196,9 @@ class Network (object):
             recourseAttributea.append(
                 RecourseAttribute('NETWORK', counter.id, 'end_time', attributes_['end_time'], 'Dimensionless'))
 
+            self.scenarios[0].add_times(str(timestepper.start),str(timestepper.end), str(timestepper.timestep ))
+
+
 
         domain_list=[]
         for domain in domains:
@@ -211,23 +214,36 @@ class Network (object):
         recorders_list=[]
         metadata_={}
         for recorder in recorders:
-            dic=get_dict(recorder)
-            recorders_list.append(recorder.name)
-            for k in dic.keys():
-                if(k !='name'):
-                    metadata_[recorder.name+'@'+k]=str(dic[k])
-        counter.id = counter.id - 1
-       # attributes_['recorders'] = AttributeData('array', json.dumps(recorders_list), '-', 'Dimensionless', metadata_)
-       # self.attributes.append(ResourceAttr(counter.id, 'recorders', 'Input'))
-       # recourseAttributea.append(
-          #  RecourseAttribute('NETWORK', counter.id, 'recorders', attributes_['recorders'], 'Dimensionless'))
+                if recorder.name.lower().strip()=="database" and not hasattr(recorder, "node"):
+                    dic=get_dict(recorder)
+                    print "Found database =================> "
+                    print dic
+                    metadata={}
+                    for key in dic:
+                        if key!="name":
+                            metadata[key]=dic[key]
+                    '''
+                    recorders_list.append(recorder.name)
+                    for k in dic.keys():
+                        if(k !='name'):
+                            metadata_[recorder.name+'@'+k]=str(dic[k])
+                    '''
+                    counter.id = counter.id - 1
+                    attributes_['recorder'] = AttributeData("descriptor", "database", '-', 'Dimensionless', metadata)
+                    self.attributes.append(ResourceAttr(counter.id, "recorder", 'Input'))
+                    recourseAttributea.append(RecourseAttribute('NETWORK', counter.id, 'recorder', attributes_['recorder'], 'Dimensionless'))
         network_attributes[self.name] = attributes_
 
 class Scenario(object):
     def __init__(self):
+
         self.description="Created by PywrApp"
         self.name="scenarion_" + str(datetime.datetime.now())
         self.resourcescenarios=[]
+    def add_times(self, start_time, end_time, time_step):
+        self.start_time = start_time
+        self.end_time = end_time
+        self.time_step = time_step
 
 class Resourcescenario(object):
     def __init__(self, source, resource_attr_id, attr_id, value):
@@ -251,8 +267,9 @@ class AttributeData (object):
 
 class Recorder(object):
     def __init__(self, name, record_):
-        self.type = record_['type']
         self.name=name
+        if "type" in record_.keys():
+            self.type = record_['type']
         if "recorders" in record_.keys():
             self.recorders=record_['recorders']
             self.agg_func=record_['agg_func']
@@ -262,6 +279,14 @@ class Recorder(object):
             self.timesteps=record_['timesteps']
         if  "comment" in record_.keys():
             self.comment = record_['comment']
+        if "csvfile" in record_.keys():
+            self.csvfile = record_['csvfile']
+        if "url" in record_.keys():
+            self.url = record_['url']
+
+
+
+
 
 '''
 class Recorder(object):
@@ -284,20 +309,20 @@ class Domain (object):
         self.color=domain_.color
 
 def get_timeseriesdates(timestepper):
-    start=parse(timestepper.start)
-    end=parse(timestepper.end)
+    start=prs(timestepper.start)
+    end=prs(timestepper.end)
     timestep=(timestepper.timestep)
     timeseries=[]
     while (end>=start):
         timeseries.append(start)
-
         start = start + timedelta(days=timestep)
 
 def read_data_file(url, column=None):
     with open(os.path.join(url)) as f:
         content = f.read().splitlines()
-    head = content[0].split(',')
+        head = content[0].split(',')
     if column is not None:
+        print "It is not none ...."
         for i in range(0, len(head)):
             if (head[i].strip().lower() == 'date' or head[i].strip().lower() == 'index'):
                 date_index = i
@@ -318,10 +343,17 @@ def read_timeseries(url, column=None):
         url=os.path.join(json_file__folder[0], url)
 
     content, date_index, value_index=read_data_file(url, column)
+    print column, date_index, value_index
     values={}
+    date_format = "%d/%m/%Y"
     for i in range (1, len(content)):
+        if content[i]=="":
+            continue
         lin=content[i].split(',')
-        values[lin[date_index]]=lin[value_index]
+        if lin[0]=="":
+            continue
+        date__=datetime.datetime.strptime(lin[date_index], date_format)
+        values[str(date__)]=lin[value_index]
     return json.dumps({'0' :values})
 
 def read_seasonall(values_):
@@ -362,7 +394,6 @@ def read_seasonall(values_):
             else:
                 day+=1
     return json.dumps({'0': values})
-
 
 def get_variable_attribute_type_and_value(value_, name, counter, attributes_, _type, metadata_, res_attributes=None):
     value = value_
@@ -667,7 +698,6 @@ def import_net (filename, connector):
         if hasattr(x, "recorders"):
             rcds=get_dict(x.recorders)
             for name in rcds.keys():
-
                 recorders.append(Recorder(name, rcds[name]))
         if hasattr(x, "domains"):
             for domain_ in x.domains:
@@ -755,7 +785,7 @@ def import_net (filename, connector):
         for link in network.links:
             for rs in link.attributes:
                 rs.attr_id = attrs_names_ids[rs.attr_id]
-
+        #print get_dict(network)
         NetworkSummary = connector.call('add_network', {'net': get_dict(network)})
         return NetworkSummary
 

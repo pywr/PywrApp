@@ -333,6 +333,8 @@ class Edge(object):
         for attr_ in link_.attributes:
             attr = attributes_ids[attr_.attr_id]
             res = resourcescenarios_ids[attr_.id]
+            slot_from=None
+            slot_to = None
             if (attr.name == 'slot_from'):
                 if(res.value.value=='None'):
                     slot_from = None
@@ -343,7 +345,6 @@ class Edge(object):
                     slot_to = None
                 else:
                     slot_to = res.value.value
-
         if(slot_to !=None or slot_from !=None):
             self.attrs.append(slot_from)
             self.attrs.append(slot_to)
@@ -376,21 +377,17 @@ def get_recotds(network, attributes_ids, resourcescenarios_ids):
     for attr_ in network.attributes:
         attr = attributes_ids[attr_.attr_id]
         res = resourcescenarios_ids[attr_.id]
-        if (attr.name == 'recorders'):
-            values=json.loads(res.value.value)
+        print "Toz:   ", attr.name
+        if (attr.name == 'recorder'):
+            value=res.value.value
             metadata = json.loads(res.value.metadata)
-            for value in values:
-                dic={}
-                recorders[value]=dic
-                for key in metadata.keys():
-                    if key.startswith(value+'@'):
-                        item=key.replace(value+'@','')
-                        if item =='timesteps':
-                            dic[item] = int(metadata[key])
-                        else:
-                            dic[item]=metadata[key]
-
-    return recorders
+            print "MetaData =================>", metadata
+            dic={}
+            recorders[value]=dic
+            for key in metadata.keys():
+                if(key!="user_id"):
+                  dic[key]=metadata[key]
+    #return recorders
 
 class Domain(object):
     def __init__(self, name, color):
@@ -534,7 +531,7 @@ def pywrwriter (network, attrlist, output_file, steps):
     resourcescenarios_ids=get_resourcescenarios_ids(network.scenarios[0].resourcescenarios)
     timestepper=Timestepper(network, attributes_ids, resourcescenarios_ids)
     metadata = Metadata(network, resourcescenarios_ids, attributes_ids)
-    #get_recotds(network, attributes_ids, resourcescenarios_ids)
+    get_recotds(network, attributes_ids, resourcescenarios_ids)
     #get_recotds(network, attributes_ids, resourcescenarios_ids)
     domains=[]
     for attr_ in network.attributes:
@@ -582,7 +579,6 @@ def pywrwriter (network, attrlist, output_file, steps):
     write_progress(6, steps)
     with open(output_file, "w") as text_file:
         text_file.write(pywrNetwork.get_json())
-
         #text_file.write(json.dumps(get_dict(pywrNetwork), indent=4))
 
 
