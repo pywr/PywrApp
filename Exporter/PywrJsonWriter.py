@@ -377,7 +377,7 @@ class Recorder(object):
                 self.node = value[1]
                 self.type = value[0]
 
-def get_recotds(network, attributes_ids, resourcescenarios_ids):
+def get_records(network, attributes_ids, resourcescenarios_ids):
     global has_tablerecorder
     for attr_ in network.attributes:
         attr = attributes_ids[attr_.attr_id]
@@ -519,8 +519,10 @@ def get_parameters_refs(nodes):
     return  parameters
 
 def pywrwriter (network, attrlist, output_file, steps):
-    json_file__folder=os.path.dirname(output_file)
+
     write_progress(4, steps)
+
+    target_dir=os.path.dirname(output_file)
 
     nodes=[]
     edges=[]
@@ -531,8 +533,8 @@ def pywrwriter (network, attrlist, output_file, steps):
     resourcescenarios_ids=get_resourcescenarios_ids(network.scenarios[0].resourcescenarios)
     timestepper=Timestepper(network, attributes_ids, resourcescenarios_ids)
     metadata = Metadata(network, resourcescenarios_ids, attributes_ids)
-    get_recotds(network, attributes_ids, resourcescenarios_ids)
-    #get_recotds(network, attributes_ids, resourcescenarios_ids)
+    get_records(network, attributes_ids, resourcescenarios_ids)
+    
     domains=[]
     for attr_ in network.attributes:
         attr = attributes_ids[attr_.attr_id]
@@ -563,15 +565,16 @@ def pywrwriter (network, attrlist, output_file, steps):
                 if type(value) is dict:
                     if value['type'] == 'arrayindexed' or value['type'] == 'dailyprofile' or value['type'] == 'dataframe':
                         file_name=node.name+"_"+k+'.csv'
-                        write_time_series_tofile(value['url'], os.path.join(json_file__folder, file_name))
+                        write_time_series_tofile(value['url'], os.path.join(target_dir, file_name))
                         value['url']=file_name
+
     for k in parameters:
         value=parameters[k]
 
         if type(value) is dict and 'type' in value.keys():
             if value['type'] == 'arrayindexed' or value['type'] == 'dailyprofile':
                 file_name = node.name + "_" + k + '.csv'
-                write_time_series_tofile(value['url'], os.path.join(json_file__folder, file_name))
+                write_time_series_tofile(value['url'], os.path.join(target_dir, file_name))
                 value['url'] = file_name
     write_progress(5, steps)
 

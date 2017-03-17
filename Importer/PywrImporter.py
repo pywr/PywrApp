@@ -37,7 +37,7 @@ def commandline_parser():
     parser.add_argument('-f', '--json_file',
                         help='file containing pywr json.')
 
-    parser.add_argument('-u', '--server-url',
+    parser.add_argument('-u', '--server_url',
                         help='''Specify the URL of the server to which this
                             plug-in connects.''')
 
