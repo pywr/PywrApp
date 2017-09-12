@@ -8,6 +8,25 @@ from IPython.core.display import display
 import time
 pandas.set_option("precision", 3)
 
+
+def get_dict(obj):
+    if not  hasattr(obj,"__dict__"):
+        return obj
+    result = {}
+    for key, val in obj.__dict__.items():
+
+        if key.startswith("_"):
+            continue
+        if isinstance(val, list):
+            element = []
+            for item in val:
+                element.append(get_dict(item))
+        else:
+            element = get_dict(obj.__dict__[key])
+        result[key] = element
+    return result
+
+
 def load_model(file_name):
     model = Model.load(file_name)
     #start= pandas.to_datetime(model.timestepper.start)
@@ -25,6 +44,9 @@ def load_model(file_name):
         file.write("timeStep," + str(timeStep) + '\n')
         file.write("rec_name, rec_type, res name, type, value/s\n")
         for record in model.recorders:
+            #print ("===============================================>")
+            print ("Rec ===>",get_dict(record))
+            #print ("===============================================>")
             if hasattr(record, "csvfile"):
                 '''
                 if hasattr(record, 'node_names'):
@@ -34,6 +56,9 @@ def load_model(file_name):
                     file.write(line)
                 '''
                 file.write(record.name+ ",csvrecorder,"+record.csvfile+"\n")
+            elif hasattr(record, "h5file"):
+
+                file.write(record.name + ",tablesrecorder," + record.h5file + "\n")
             else:
                 if hasattr(record, 'node'):
                     file.write (record.name+',single_recorder,'+record.node.name)

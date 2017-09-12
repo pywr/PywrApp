@@ -7,14 +7,15 @@ from dateutil.parser import parse as prs
 from datetime import datetime
 from datetime import timedelta
 import datetime
-import inspect
-
+from HydraLib.HydraException import HydraPluginError
+from data_files_reader import read_data_file_column, get_h5DF_store, get_node_attr_values, read_hdf_file_column
 
 recourseAttributea =[]
 ref_parameters={}
 
-has_tablerecorder=False
 
+has_tablerecorder=False
+timeseries=None
 json_file__folder=[]
 
 class Counter(object):
@@ -71,8 +72,9 @@ class Node(object):
         i=0
         self.id = counter.id
         self.status = "A"
-        self.name = node_.name
-        self.type = node_.type
+        print ("====>", type(node_))
+        self.name = node_['name']
+        self.type = node_['type']
         for recorder in recorders:
             dict=get_dict(recorder)
             if('node' in dict.keys()):
@@ -100,20 +102,29 @@ class Node(object):
             self.x = str(random.randint(0,99))
         if(self.y==None):
             self.y = str(random.randint(0,99))
+        print ("====>",node_)
 
-        for i in range(0, len(node_.__dict__.keys())):
-            k=node_.__dict__.keys()[i]
+        keys_=sorted(node_.keys())
+        print "Node keys: ", keys_
+
+        for i in range(0, len(keys_)):#.__dict__.keys())):
+            k=keys_[i]
             if(k.lower() != 'name' and k.lower() !='type' and k.lower() !='position'):
-                val=node_.__dict__.values()[i]
+                val=node_[k]
                 if k=='flow':
                     is_flow=False
+                print "___________________--------------------->",  self.name
+                print k
                 get_attribute_type_and_value(val, k, counter, attributes_, 'input', self.attributes)
         if is_flow == True and has_tablerecorder==True:
             get_variable_attribute_type_and_value('NULL', 'mean_flow', counter, attributes_, 'output', {}, self.attributes)
 
 
-        get_attribute_type_and_value(node_.type, 'node_type', counter, attributes_, 'input', self.attributes)
+
+
+        get_attribute_type_and_value(node_['type'], 'node_type', counter, attributes_, 'input', self.attributes)
         nodes_attributes [self.name]= attributes_
+        print get_dict(attributes_)
 
 class Link(object):
     def __init__(self, edge_, nodes_ids, counter, links_attributes):
@@ -151,14 +162,14 @@ class Network (object):
         author=None
         minimum_version=None
         if(metadata !=None):
-            if hasattr(metadata, "title"):
-                self.name=metadata.title
-            if hasattr(metadata, "description"):
-                self.description =metadata.description
-            if hasattr(metadata, "author"):
-                author=metadata.author
-            if hasattr(metadata, "minimum_version"):
-                minimum_version = metadata.minimum_version
+            if ("title" in metadata):
+                self.name=metadata['title']
+            if ( "description" in metadata):
+                self.description =metadata['description']
+            if "author" in metadata:
+                author=metadata['author']
+            if ("minimum_version" in metadata):
+                minimum_version = metadata['minimum_version']
         else:
             self.name = name + '_' + str(datetime.datetime.now())
             self.description = "Pywr network"
@@ -190,24 +201,24 @@ class Network (object):
 
         if(timestepper!=None):
             counter.id = counter.id - 1
-            attributes_['timestep'] = AttributeData('descriptor', str(timestepper.timestep), '-', 'Dimensionless')
+            attributes_['timestep'] = AttributeData('descriptor', str(timestepper['timestep']), '-', 'Dimensionless')
             self.attributes.append(ResourceAttr(counter.id, 'timestep', 'Input'))
             recourseAttributea.append(
                 RecourseAttribute('NETWORK', counter.id, 'timestep', attributes_['timestep'], 'Dimensionless'))
 
             counter.id = counter.id - 1
-            attributes_['start_time'] = AttributeData('descriptor', str(timestepper.start), '-', 'Dimensionless')
+            attributes_['start_time'] = AttributeData('descriptor', str(timestepper['start']), '-', 'Dimensionless')
             self.attributes.append(ResourceAttr(counter.id, 'start_time', 'Input'))
             recourseAttributea.append(
                 RecourseAttribute('NETWORK', counter.id, 'start_time', attributes_['start_time'], 'Dimensionless'))
 
             counter.id = counter.id - 1
-            attributes_['end_time'] = AttributeData('descriptor', str(timestepper.end), '-', 'Dimensionless')
+            attributes_['end_time'] = AttributeData('descriptor', str(timestepper['end']), '-', 'Dimensionless')
             self.attributes.append(ResourceAttr(counter.id, 'end_time', 'Input'))
             recourseAttributea.append(
                 RecourseAttribute('NETWORK', counter.id, 'end_time', attributes_['end_time'], 'Dimensionless'))
 
-            self.scenarios[0].add_times(str(timestepper.start),str(timestepper.end), str(timestepper.timestep ))
+            self.scenarios[0].add_times(str(timestepper['start']),str(timestepper['end']), str(timestepper['timestep'] ))
 
 
 
@@ -227,6 +238,8 @@ class Network (object):
         for recorder in recorders:
                 if recorder.name.lower().strip()=="database" and not hasattr(recorder, "node"):
                     dic=get_dict(recorder)
+                    print "RECODER IS FOUND ...................", recorder.name
+                    print dic.keys()
                     metadata={}
                     for key in dic:
                         if key!="name":
@@ -264,6 +277,7 @@ class Resourcescenario(object):
 
 class AttributeData (object):
     def __init__(self,  type, value, unit, dimen, metadata=None):
+        print "Type: ", type
         self.hidden='N'
         self.type=type
         self.name = 'pywerApp'
@@ -293,10 +307,11 @@ class Recorder(object):
             self.csvfile = record_['csvfile']
         if "url" in record_.keys():
             self.url = record_['url']
-
-
-
-
+        #####################################
+        if "url" in record_.keys():
+            self.url = record_['url']
+        if "url" in record_.keys():
+            self.url = record_['url']
 
 '''
 class Recorder(object):
@@ -311,7 +326,6 @@ class Recorder(object):
             self.timesteps=record_.timesteps
         if hasattr(record_, "comment"):
             self.comment = record_.comment
-
 '''
 class Domain (object):
     def __init__(self, domain_):
@@ -319,13 +333,15 @@ class Domain (object):
         self.color=domain_.color
 
 def get_timeseriesdates(timestepper):
-    start=prs(timestepper.start)
-    end=prs(timestepper.end)
-    timestep=(timestepper.timestep)
+    start=prs(timestepper['start'])
+    end=prs(timestepper['end'])
+    timestep=(timestepper['timestep'])
+    timeseries=[]
     timeseries=[]
     while (end>=start):
         timeseries.append(start)
         start = start + timedelta(days=timestep)
+    return timeseries
 
 def read_data_file(url, column=None):
     with open(os.path.join(url)) as f:
@@ -346,14 +362,30 @@ def read_data_file(url, column=None):
             value_index = 0
     return content, date_index, value_index
 
-def read_timeseries(url, column=None):
+
+def read_tablesarray(url, root, data_node):
+    ss = os.path.dirname(url)
+    if (ss == ''):
+        url = os.path.join(json_file__folder[0], url)
+    store=get_h5DF_store(url)
+    values_= get_node_attr_values(store, data_node, root)
+    return json.dumps( values_.tolist())
+
+def read_timeseries(url, name,  sheetname, column=None):
     ss= os.path.dirname(url)
     if(ss == ''):
         url=os.path.join(json_file__folder[0], url)
-
-    content, date_index, value_index=read_data_file(url, column)
+    values_ = read_data_file_column(url, name, column, sheetname)
+    '''
     values={}
     date_format = "%d/%m/%Y"
+
+    for date_ in values_:
+        date__ = get_datetime(date_)# datetime.datetime.strptime(date_, date_format)
+        values[str(date__)] = str(values_[date_])
+
+
+    content, date_index, value_index=read_data_file(url, column)
     for i in range (1, len(content)):
         if content[i]=="":
             continue
@@ -362,7 +394,11 @@ def read_timeseries(url, column=None):
             continue
         date__=datetime.datetime.strptime(lin[date_index], date_format)
         values[str(date__)]=lin[value_index]
-    return json.dumps({'0' :values})
+'''
+    #return json.dumps({'0' :values})
+
+    return json.dumps({'0': values_})
+
 
 def read_seasonall(values_):
     from datetime import date
@@ -394,10 +430,12 @@ def read_seasonall(values_):
 
             values[str(dat)] = lin[value_index]
     else:
-        for v in values_.values:
+        print "vaues____:", (values_.keys())
+        keys_=values_.keys()
+        for v in values_['values']:
             dat=datetime.datetime(year, month, day)
             values[str(dat)]=v
-            if(values_.type.lower=='monthlyprofile'):
+            if(values_['type'].lower=='monthlyprofile'):
                 month+=1
             else:
                 day+=1
@@ -420,22 +458,56 @@ def get_variable_attribute_type_and_value(value_, name, counter, attributes_, _t
 def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_attributes=None):
     metadata = {}
     metadata['single'] = 'yes'
+    print (type(value_),"_toz=====>", value_)
     try:
-        float(value_)
-        value = str(value_)
-        type = 'scalar'
+        print "Value type:===>>", value_['type']
+        print name
     except:
+        print "No type found"
+    print name
+    print _type
+    print "Res attr: ",type(res_attributes), get_dict(res_attributes)
+    print "======================================================================"
+
+    if type(value_) is dict:
+        keys_=value_.keys()
+    else:
+        keys_={}
+    try:
+        if "attr_type" in keys_ and value_['type']=='constant':
+            metadata['attr_type'] = value_.type
+            value = str(float(value_.value))
+        else:
+            float(value_)
+            value = str(value_)
+        attr_type = 'scalar'
+        if  "attr_type" in keys_:
+            metadata['attr_type']=value_['type']
+            print name, value_
+    except:
+        print "It is failed ......"
+        print name
+        print value_
         if isinstance(value_, list):
-            type = "array"
+            print "It is failed ......1"
+            attr_type = "array"
             value = json.dumps(value_)
         elif isinstance(value_, basestring):
-            if(value_ in ref_parameters.keys()):
-                attr = ref_parameters[value_]
-                type = attr.type
+            print "It is failed ......2", name, value_
+            attr=is_in_dict(value_, ref_parameters)
+            if attr != None:
+                print "Reference is foun ..."
+                print get_dict((attr))
+            #if(value_ in ref_parameters.keys()):
+                #toz   toz
+                #attr = ref_parameters[value_]
+                attr_type = attr.type
                 value = attr.value
                 metadata=json.loads(attr.metadata)
+                print "Metadata: ", metadata
                 if( 'type' in metadata.keys()):
                     if(metadata['type']=='aggregated'):
+                        print "From aggregated section"
                         get_aggregated(json.loads(value), counter, attributes_, _type, res_attributes)
                     elif(metadata['type']=='indexedarray'):
                         get_aggregated(json.loads(value), counter, attributes_, _type, res_attributes)
@@ -446,74 +518,98 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
                         get_aggregated(json.loads(value), counter, attributes_, _type, res_attributes)
             else:
                 value=value_
-                type='descriptor'
-        elif hasattr(value_, "type"):
-            metadata['type'] = value_.type.lower()
-            if value_.type.lower() =='constant':
-                value = str(value_.values)
-                type = 'scalar'
-            elif value_.type.lower() == "arrayindexed" or value_.type.lower() == "dataframe":
-                type = 'timeseries'
-                metadata['type'] = value_.type
-                if hasattr(value_, "column"):
-
-                    value = read_timeseries(value_.url, value_.column)
-                    metadata['column']=value_.column
+                attr_type='descriptor'
+        elif "type" in keys_:
+            print "It is failed ......3"
+            metadata['type'] = value_['type'].lower()
+            if value_['type'].lower() =='constant':
+                value = str(value_['value'])
+                attr_type = 'scalar'
+            elif value_['type'].lower() == "arrayindexed" or value_['type'].lower() == "dataframe" or value_['type'].lower() == "tablesarray":
+                metadata['type'] = value_['type']
+                if value_['type'].lower()=='tablesarray':
+                    metadata['where']=value_['where']
+                    metadata['node'] = value_['node']
+                    value=read_tablesarray(value_['url'], value_['where'] ,value_['node'])
+                    attr_type = 'array'
                 else:
-                    value = read_timeseries(value_.url)
-                if hasattr(value_, "parse_dates"):
-                    metadata['parse_dates'] = str(value_.parse_dates)
-                if hasattr(value_, "index_col"):
-                    metadata['index_col'] = str(value_.index_col)
-                if hasattr(value_, "dayfirst"):
-                    metadata['dayfirst'] = str(value_.dayfirst)
+                    print "------------------------>", value_.type.lower()
+                    attr_type = 'timeseries'
+                    sheetname=None
+                    if 'sheetname' in keys_:
+                        sheetname=value_['sheetname']
+                    if  "column" in value_:
+                        value = read_timeseries(value_['url'],sheetname,  name, value_['column'])
+                        metadata['column']=value_['column']
+                    else:
+                        value = read_timeseries(value_['url'], name, sheetname)
+                if  "parse_dates" in keys_:
+                    metadata['parse_dates'] = str(value_['parse_dates'])
+                if "index_col" in keys_:
+                    metadata['index_col'] = str(value_['index_col'])
+                if "dayfirst" in keys_:
+                    metadata['dayfirst'] = str(value_['dayfirst'])
 
-            elif value_.type.lower()== "monthlyprofile" or value_.type.lower()== "dailyprofile" :
-                type = 'timeseries'
-                metadata['type']=value_.type
+            elif value_['type'].lower()== "monthlyprofile" or value_['type'].lower()== "dailyprofile" :
+                attr_type = 'timeseries'
+                metadata['type']=value_['type']
                 value = read_seasonall(value_)
-                if hasattr(value_, "column"):
-                    metadata['column'] = value_.column
-                if hasattr(value_, "parse_dates"):
-                    metadata['parse_dates'] = str(value_.parse_dates)
-            elif value_.type.lower() == 'aggregated':
+                if "column" in keys_:
+                    metadata['column'] = value_['column']
+                if "parse_dates" in keys_:
+                    metadata['parse_dates'] = str(value_['parse_dates'])
+            elif value_['type'].lower() == 'aggregated':
+                print "It is aggregated .."
                 get_aggregated_attribute(value_, name, counter, attributes_, _type, res_attributes)
                 return
-            elif value_.type.lower() == 'indexedarray':
+            elif value_['type'].lower() == 'indexedarray':
                 get_indexedarray_attributes(value_, name, counter, attributes_, _type,  res_attributes)
 
                 return
-            elif value_.type.lower() == 'controlcurveindex':
+            elif value_['type'].lower() == 'controlcurveindex':
+                print "== == == == == == = >> >> > controlcurveindex"
                 get_controlcurveindex_attributes(value_, name, counter, attributes_, _type, res_attributes)
+                print "DONEW .......", res_attributes
                 return
-            elif value_.type.lower() =='monthlyprofilecontrolcurve':
+            elif value_['type'].lower() =='monthlyprofilecontrolcurve':
+                print ("It is monthlyprofilecontrolcurve")
                 get_monthlyprofilecontrolcurve_attributes(value_, name, counter, attributes_, _type, res_attributes)
                 return
-            elif value_.type.lower() == 'controlcurveinterpolated':
+            elif value_['type'].lower() == 'controlcurveinterpolated':
+
                 get_controlcurveinterpolated_attributes(value_, name, counter, attributes_, _type, res_attributes)
                 return
-            elif value_.type.lower() == 'recorderthreshold':
+            elif value_['type'].lower() == 'recorderthreshold':
                 get_recorderthreshold(value_, name, counter, attributes_, _type, res_attributes)
                 return
 
-    if hasattr(value_, "comment"):
-        metadata['comment']=value_.comment
+    if "comment" in keys_:
+        metadata['comment']=value_['comment']
+    print "____value====>>>>", value_
     counter.id = counter.id - 1
-    attributes_[name] = AttributeData(type, value, '-', 'Dimensionless', metadata)
+    attributes_[name] = AttributeData(attr_type, value, '-', 'Dimensionless', metadata)
     if(res_attributes!=None):
         res_attributes.append(ResourceAttr(counter.id, name, _type))
         recourseAttributea.append(RecourseAttribute('NODE', counter.id, name , attributes_[name],'Dimensionless'))
 
+
+def is_in_dict(key_, dict_):
+    for k in dict_.keys():
+        if k.strip().lower()== key_.strip().lower():
+            return dict_[k]
+    return None
+
 def get_aggregated_attribute(value_, name, counter, attributes_, _type, res_attributes=None):
+    print "hello from It is aggregated .."
+    print json.dumps(value_['parameters'])
     metadata={}
     type = 'array'
-    value = json.dumps(value_.parameters)
+    value = json.dumps(value_['parameters'])
     metadata['single'] = 'no'
-    metadata['agg_func'] = value_.agg_func
+    metadata['agg_func'] = value_['agg_func']
     metadata['type'] = 'aggregated'
-    if hasattr(value_, "comment"):
-        metadata['comment'] = value_.comment
-
+    if  "comment" in value_:
+        metadata['comment'] = value_['comment']
     counter.id = counter.id - 1
     attr= AttributeData(type, value, '-', 'Dimensionless', metadata)
     attributes_[name] =attr
@@ -523,7 +619,9 @@ def get_aggregated_attribute(value_, name, counter, attributes_, _type, res_attr
     get_aggregated (json.loads(attributes_[name].value), counter, attributes_,_type,  res_attributes)
 
 def get_aggregated(paras, counter, attributes_, _type, res_attributes):
+    print "From aggg function ....."
     for para in paras:
+        print "Parameter: ", para
         get_attribute_type_and_value(para, para, counter, attributes_, _type, res_attributes)
 
 def get_indexedarray_attributes(value_, name, counter, attributes_, _type, res_attributes=None):
@@ -531,13 +629,13 @@ def get_indexedarray_attributes(value_, name, counter, attributes_, _type, res_a
     type = 'array'
     metadata['single'] = 'no'
     metadata['type'] = 'indexedarray'
-    if hasattr(value_, "comment"):
-        metadata['comment'] = value_.comment
-    index_list = get_indexedarray(value_.params, name, counter, attributes_, _type, res_attributes=None)
+    if "comment" in value_:
+        metadata['comment'] = value_['comment']
+    index_list = get_indexedarray(value_['params'], name, counter, attributes_, _type, res_attributes=None)
     value = json.dumps(index_list)
 
-    if hasattr(value_, "index_parameter"):
-        index_parameter=value_.index_parameter
+    if "index_parameter" in value_:
+        index_parameter=value_['index_parameter']
         metadata['index_parameter']=index_parameter
     attr = AttributeData(type, value, '-', 'Dimensionless', metadata)
     counter.id = counter.id - 1
@@ -562,16 +660,20 @@ def get_controlcurveindex_attributes(value_, name, counter, attributes_, _type, 
     type='array'
     metadata ['type'] = 'controlcurveindex'
     metadata['single'] = 'no'
-    if hasattr(value_, "storage_node"):
-        metadata['storage_node']=value_.storage_node
-    if hasattr(value_, "comment"):
-        metadata['comment'] = value_.comment
-    value=value_.control_curves
+    print " == == = >> >> > controlcurveindex", value_
+    if "storage_node" in value_:
+        print "Storage node is found ", value_["storage_node"]
+        metadata['storage_node']=value_["storage_node"]
+    if "comment" in value_:
+        metadata['comment'] = value_['comment']
+    value=value_['control_curves']
     for item in value:
         get_attribute_type_and_value(item, item, counter, attributes_, _type, res_attributes)
     attr = AttributeData(type, json.dumps(value), '-', 'Dimensionless', metadata)
     counter.id = counter.id - 1
     attributes_[name] = attr
+    print name, "Attr ibut is: ",get_dict(attr)
+    print "recourseAttributea", recourseAttributea
     if (res_attributes != None):
         res_attributes.append(ResourceAttr(counter.id, name, _type))
         recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
@@ -581,17 +683,17 @@ def get_monthlyprofilecontrolcurve_attributes(value_, name, counter, attributes_
     type = 'array'
     metadata['type'] = 'monthlyprofilecontrolcurve'
     metadata['single'] = 'no'
-    if hasattr(value_, "storage_node"):
-        metadata['storage_node'] = value_.storage_node
-    if hasattr(value_, "comment"):
-        metadata['comment'] = value_.comment
-    if hasattr(value_, "scale"):
-        metadata['scale'] = str(value_.scale)
+    if  "storage_node" in value_:
+        metadata['storage_node'] = value_['storage_node']
+    if "comment" in value_:
+        metadata['comment'] = value_['comment']
+    if "scale" in value_:
+        metadata['scale'] = str(value_['scale'])
     values_list=[name+'_profile', name+'_control_curve', name+'_values']
 
-    get_attribute_type_and_value(value_.profile, name + '_profile', counter, attributes_, _type, res_attributes)
-    get_attribute_type_and_value(value_.control_curve, name + '_control_curve', counter, attributes_, _type, res_attributes)
-    get_attribute_type_and_value(value_.values, name + '_values', counter, attributes_, _type, res_attributes)
+    get_attribute_type_and_value(value_['profile'], name + '_profile', counter, attributes_, _type, res_attributes)
+    get_attribute_type_and_value(value_['control_curve'], name + '_control_curve', counter, attributes_, _type, res_attributes)
+    get_attribute_type_and_value(value_['values'], name + '_values', counter, attributes_, _type, res_attributes)
     counter.id = counter.id - 1
     attr = AttributeData(type, json.dumps(values_list), '-', 'Dimensionless', metadata)
     attributes_[name] = attr
@@ -604,12 +706,12 @@ def get_recorderthreshold(value_, name, counter, attributes_, _type, res_attribu
     metadata = {}
     metadata['single'] = 'no'
     metadata['type'] = 'recorderthreshold'
-    if hasattr(value_, "comment"):
-        metadata['comment'] = value_.comment
-    metadata['recorder']=value_.recorder
-    metadata['threshold']=str(value_.threshold)
-    metadata['predicate']=value_.predicate
-    value=value_.values
+    if "comment" in value_:
+        metadata['comment'] = value_['comment']
+    metadata['recorder']=value_['recorder']
+    metadata['threshold']=str(value_['threshold'])
+    metadata['predicate']=value_['predicate']
+    value=value_['values']
     counter.id = counter.id - 1
     attr = AttributeData(type, json.dumps(value), '-', 'Dimensionless', metadata)
     attributes_[name] = attr
@@ -618,22 +720,21 @@ def get_recorderthreshold(value_, name, counter, attributes_, _type, res_attribu
         recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
 
 
-
 def get_controlcurveinterpolated_attributes(value_, name, counter, attributes_, _type, res_attributes):
     type = 'array'
     metadata = {}
     metadata['single'] = 'no'
-    metadata['type']='ControlCurveInterpolated'
-    if hasattr(value_, "comment"):
-        metadata['comment'] = value_.comment
+    print value_, "=====================>>>>>"
+    if "comment" in value_:
+        metadata['comment'] = value_['comment']
 
-    if hasattr(value_, "storage_node"):
-        metadata['storage_node'] = value_.storage_node
+    if "storage_node" in value_:
+        metadata['storage_node'] = value_['storage_node']
 
-    control_curve=value_.control_curve
+    control_curve=value_['control_curve']
     get_attribute_type_and_value(control_curve, name + 'control_curve', counter, attributes_, _type, res_attributes)
     counter.id = counter.id - 1
-    value= value_.values
+    value= value_['values']
 
     metadata['control_curve']=name + 'control_curve'
 
@@ -656,6 +757,12 @@ def get_new_attributes(attrlist, c_attrlist):
 def get_dict(obj):
     if not  hasattr(obj,"__dict__"):
         return obj
+    '''
+    if isinstance(obj, list):
+        print "IT IS A LIST ====>>>>>>>>"
+        for item in obj:
+            get_dict(item)
+    '''
     result = {}
     for key, val in obj.__dict__.items():
 
@@ -670,8 +777,38 @@ def get_dict(obj):
         result[key] = element
     return result
 
+
+def check_in_a_list(json_list):
+    for item in json_list:
+        if (type(item) is list):
+            check_in_a_list(item)
+        elif (type(item) is dict):
+            for kk in item.keys():
+                print kk
+                if (type(item[kk]) is list):
+                    check_in_a_list(item[kk])
+                else:
+                    print kk, item[kk]
+        else:
+            print ((item))
+
+
+def test_for_invalid_keys_names(json_string):
+    main_json = json.loads(json_string)
+    for key in main_json.keys():
+        print "key is: ", key
+        if (type(main_json[key]) is list):
+            for item in main_json[key]:
+                check_in_a_list(item)
+        elif (type(main_json[key]) is dict):
+            print main_json[key]
+
+    import sys
+    #sys.exit(0)
+
 def import_net (filename, connector):
         has_tablerecorder = False
+        json_list=[]
         json_file__folder.append(os.path.dirname(filename))
         counter=Counter()
         recorders=[]
@@ -687,6 +824,9 @@ def import_net (filename, connector):
         nodes_attributes={}
         links_attributes = {}
         network_attributes={}
+        #with open(filename) as f:
+        #    json_string = f.read().splitlines()
+        #'''
         f = open(filename,'r')
         json_string = ""
         while 1:
@@ -694,32 +834,71 @@ def import_net (filename, connector):
             if not line:break
             json_string += line
         f.close()
-        x = json.loads(json_string, object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
-        timeseries=None
-        if hasattr(x, "timestepper"):
-            timeseries=get_timeseriesdates(x.timestepper)
+        #'''
+        test_for_invalid_keys_names(json_string)
+        main_json = json.loads(json_string)#, object_hook=lambda d: namedtuple('X', d.keys(), rename=False, verbose=False)(*d.values()))
+        #xx=main_json
+        json_list.append(main_json)
+        if "includes" in main_json:
+                for included_file in main_json['ncludes']:
+                    ss = os.path.dirname(included_file )
+                    if (ss == ''):
+                        included_file = os.path.join(json_file__folder[0], included_file)
+                    included_f = open(included_file, 'r')
+                    included_json_string = ""
+                    while 1:
+                        line = included_f.readline()
+                        if not line: break
+                        included_json_string += line
+                    included_f.close()
+
+                    included_x = json.loads(included_json_string , object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
+                    json_list.append(included_x)
+
+
+
+                    if ("nodes" in included_x):
+                        for node in included_x['nodes']:
+                            main_json.nodes.append(node)
+
+                    if "edges" in included_x:
+                        for edge in included_x['edges']:
+                            main_json.edges.append(edge)
+                    #if hasattr(included_x, "parameters"):
+                    #    for key_ in included_x.parameters:
+                    #        if hasattr(main_json, "parameters"):
+                    #           main_json.parameters[key_]=included_x.parameters[key_]
+
+        global timeseries
+        if "timestepper" in main_json:
+            timeseries=get_timeseriesdates(main_json['timestepper'])
         project=Project()
         request=jsonpickle.dumps(project).replace("/","_").replace("\"", '\'')
         Proj = connector.call('add_project', {'project': project.__dict__})
-        if hasattr(x, "recorders"):
-            rcds=get_dict(x.recorders)
-            for name in rcds.keys():
-                recorders.append(Recorder(name, rcds[name]))
-        if hasattr(x, "domains"):
-            for domain_ in x.domains:
+        if ("recorders" in main_json):
+            rcds=get_dict(main_json['recorders'])
+            print "SOSOSOSOS"
+            print rcds.keys()
+            for kk in rcds.keys():
+                print type(rcds[kk])
+                print rcds[kk]
+                recorders.append(Recorder(kk, rcds[kk]))
+
+        if ( "domains" in main_json):
+            for domain_ in main_json['domains']:
                 domains.append(Domain(domain_))
 
         timestepper=None
-        if hasattr(x, "timestepper"):
-            timestepper = x.timestepper
+        if ("timestepper" in main_json):
+            timestepper = main_json['timestepper']
 
         solver_name=None
-        if hasattr(x, "solver"):
-            solver_name=x.solver
+        if ("solver" in main_json):
+            solver_name=main_json['solver']
 
-        if hasattr(x, "metadata"):
+        if ("metadata" in main_json):
             network = Network('Pywr',solver_name, Proj.id, counter, domains, recorders, network_attributes,
-                              timestepper, x.metadata)
+                              timestepper, main_json['metadata'])
         else:
             network = Network('Pywr', solver_name, Proj.id, counter, domains, recorders, network_attributes,
                               timestepper)
@@ -733,23 +912,34 @@ def import_net (filename, connector):
 
         counter.id=counter.id-1;
         nodes_ids={}
-
         i = 0
-        if hasattr(x, "parameters"):
-            for i in range(0, len(x.parameters.__dict__.keys())):
-                k = x.parameters.__dict__.keys()[i]
-                counter.id = counter.id - 1
-                get_attribute_type_and_value(x.parameters.__dict__.values()[i], k, counter, ref_parameters, 'default')
+        for json_ in json_list:
+            print "Parameters section is found...."
+            print json_['parameters'].keys()
+            if ("parameters" in json_):
+                for i in range(0, len(json_['parameters'].keys())):
+                    k = json_['parameters'].keys()[i]
+                    print k
+                    print "1",  json_['parameters'].values()[i]
+                    print "2", json_['parameters'][k]
 
-        for node_ in x.nodes:
+                    counter.id = counter.id - 1
+                    print "1", len(ref_parameters)
+                    get_attribute_type_and_value(json_['parameters'].values()[i], k, counter, ref_parameters, 'default')
+                    print "2", len(ref_parameters)
+
+        for node_ in main_json['nodes']:
             node_records=[]
+            print "recorders", (get_dict(recorders))
             for rec in recorders:
-                 if hasattr(rec, "node"):
-                    if rec.node==node_.name:
+                 print "REC: ", get_dict(rec)
+                 if hasattr (rec, "node"):
+                 #if ("node" in rec):
+                    if rec.node==node_['name']:
                          node_records.append(rec)
 
             node = Node(node_, counter, nodes_attributes, node_records)
-            nodes_ids[node_.name] = node.id
+            nodes_ids[node_['name']] = node.id
             counter.id = counter.id - 1
             network.nodes.append(node)
             for attr_name in nodes_attributes[node.name].keys():
@@ -759,8 +949,7 @@ def import_net (filename, connector):
                     attr=Attribute(attr_name)
                     project_attributes[attr_name]=attr
 
-
-        for edge_ in x.edges:
+        for edge_ in main_json['edges']:
            link=Link(edge_, nodes_ids, counter, links_attributes)
            counter.id = counter.id - 1
            network.links.append(link)
@@ -791,8 +980,10 @@ def import_net (filename, connector):
         for link in network.links:
             for rs in link.attributes:
                 rs.attr_id = attrs_names_ids[rs.attr_id]
-        #print get_dict(network)
+        print "ref: ", ref_parameters.keys()
+
+        print "project: ", project_attributes.keys()
+
         NetworkSummary = connector.call('add_network', {'net': get_dict(network)})
+        #print ("NETWORK:/n", get_dict(network))
         return NetworkSummary
-
-

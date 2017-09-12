@@ -22,10 +22,17 @@ api_path = os.path.realpath(exportpath)
 if api_path not in sys.path:
     sys.path.insert(0, api_path)
 
+importpath=os.path.join(pythondir, '..', 'Importer')
+api_path = os.path.realpath(importpath)
+if api_path not in sys.path:
+    sys.path.insert(0, api_path)
+
 
 from PywrJsonWriter import pywrwriter, get_dict
 
 from PywrJsonWriter import get_resourcescenarios_ids
+
+from data_files_reader import get_h5DF_store, read_tables_recoder, get_node_attr_values
 
 def commandline_parser():
     parser = ap.ArgumentParser(
@@ -149,7 +156,7 @@ def export_pywr_network(pywrexporter, args, outputfile, steps):
 
 def check_output_file(results_file, start_time):
     if os.path.isfile(results_file) == False:
-        raise HydraPluginError('No Output file is found')
+        raise HydraPluginError('No Output file is found ('+results_file+')')
     dt = prs.parse(time.ctime(os.path.getmtime(results_file)))
 
     delta = (dt - start_time).total_seconds()
@@ -164,8 +171,7 @@ def run_pywr_model(file_name):
     proc.wait()
 
 
-
-def import_results(results_file):
+def import_results(results_file, network):
     csvfile=None
     varaiables_records=[]
     with open(results_file, 'r') as res:
@@ -194,22 +200,23 @@ def import_results(results_file):
                     value.append(line[j])
             if rec_name=="rec_name":
                 continue
-
-
             if rec_type=="csvrecorder":
                 csvfile=res
                 get_csvrecorder_varaiables(csvfile, varaiables_records, start_date, end_date, timeStep)
                 continue
 
-
+            elif rec_type =="tablesrecorder":
+                h5file = res
+                get_tablesrecorder_varaiables(h5file, varaiables_records, network,  start_date, end_date, timeStep)
+                continue
             var = varaiable_record(rec_name, res, value, start_date, end_date, timeStep)
 
             varaiables_records.append(var)
+
     return varaiables_records
 
 
 def get_csvrecorder_varaiables(csvfile, varaiables_records, start_date, end_date, timeStep):
-
     with open(csvfile, 'r') as res:
         contents_ = res.read()
     contents=contents_.split('\n')
@@ -220,9 +227,18 @@ def get_csvrecorder_varaiables(csvfile, varaiables_records, start_date, end_date
         for j in range(1, len(contents)-1):
             line=contents[j].split(',')
             values.append(line[i])
-
-        var = varaiable_record('mean_flow', res_name, values, start_date, end_date, timeStep)
+            var = varaiable_record('mean_flow', res_name, values, start_date, end_date, timeStep)
         varaiables_records.append(var)
+
+def get_tablesrecorder_varaiables(h5file, varaiables_records, network, start_date, end_date, timeStep):
+    store=get_h5DF_store(h5file)
+    for node in network.nodes:
+        values=get_node_attr_values(store, node.name)
+        if values !=None:
+            var = varaiable_record('mean_flow', node.name, values, start_date, end_date, timeStep)
+            varaiables_records.append(var)
+        else:
+            continue
 
 def import_vars(network, varaiables_records, attrlist):
     attrs = dict()
@@ -289,7 +305,7 @@ if __name__ == '__main__':
 
 
         check_output_file(results_file, start_time)
-        varaiables_records=import_results(results_file)
+        varaiables_records=import_results(results_file, pywrexporter.net)
         write_progress(11, steps)
 
         import_vars(pywrexporter.net, varaiables_records, pywrexporter.attrlist)
@@ -297,7 +313,6 @@ if __name__ == '__main__':
         text = PluginLib.create_xml_response('Pywr Auto', (args.network_id), [args.scenario_id],
                                              message="Model run was successful.",
                                              errors=errors)
-
 
     except HydraPluginError, e:
         write_progress(steps, steps)

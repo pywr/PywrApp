@@ -37,14 +37,13 @@ def commandline_parser():
     parser.add_argument('-f', '--json_file',
                         help='file containing pywr json.')
 
-    parser.add_argument('-u', '--server_url',
+    parser.add_argument('-u', '--server-url',
                         help='''Specify the URL of the server to which this
                             plug-in connects.''')
 
     parser.add_argument('-c', '--session_id',
                         help='''Session ID. If this does not exist, a login will be
                             attempted based on details in config.''')
-
     return parser
 
 
@@ -53,7 +52,6 @@ class HydraConnector(JSONPlugin):
         self.connect(args)
         if self.connection is None:
             self.connect(args)
-
 
 if __name__ == '__main__':
     message=""
@@ -70,6 +68,10 @@ if __name__ == '__main__':
 
     connector=HydraConnector(args)
     write_progress(4, steps)
+    print "JOSN ===>", args.json_file
+    #with open(args.json_file) as data_file:
+    #    data = json.load(data_file)
+    #json.loads(args.json_file)
 
     network=import_net(args.json_file, connector.connection)
     write_progress(5, steps)

@@ -13,6 +13,7 @@ nodes_parameters = {}
 
 parameters = {}
 recorders={}
+from data_files_writer import write_tablesarray_to_hdf
 
 has_tablerecorder=False
 class Recorderthreshold (object):
@@ -121,6 +122,7 @@ def adjuest_parameters(complex_attrinbtes):
     to_be_deleted=[]
     for attr_name in complex_attrinbtes.keys():
         attr=complex_attrinbtes[attr_name]
+        print "attr.type", attr.type
 
         if (attr.type == 'controlcurveindex'):
             for item in attr.control_curves:
@@ -180,7 +182,6 @@ class Node(dict):
                 for key in metadata.keys():
                     if key=="user_id":
                         continue
-
                     if key == 'timesteps':
                         dic[key] = int(metadata[key])
                     else:
@@ -188,8 +189,10 @@ class Node(dict):
 
                 continue
             attr=attributes_ids[attr_.attr_id]
+            print self.name, get_dict(attr)
             res=resourcescenarios_ids[attr_.id]
             metadata = json.loads(res.value.metadata)
+            print metadata, res.value.value
             if(metadata ['single']=='no'):
                 aggregated_attributes.append(attr_)
                 continue
@@ -200,9 +203,15 @@ class Node(dict):
 
             elif res.value.type == 'descriptor':
                 single_parameters[attr.name] = res.value.value
-
             elif res.value.type == 'scalar' and metadata['single'] == 'yes':
-                single_parameters[attr.name] =float(res.value.value)
+                if 'type' in metadata.keys():
+                    vals={}
+                    vals['type']='constant'
+                    vals['value']=float(res.value.value)
+                    single_parameters[attr.name] =vals#float(res.value.value)
+                else:
+                    print "From here.."
+                    single_parameters[attr.name] = float(res.value.value)
 
             elif res.value.type == 'timeseries' and metadata['single']== 'yes':
                 if 'column' in metadata.keys():
@@ -213,7 +222,14 @@ class Node(dict):
                                                                          json.loads(res.value.metadata))
 
             elif res.value.type == 'array' and metadata['single'] == 'yes':
-                single_parameters[attr.name] =json.loads (res.value.value)
+                print "It is an array 1"
+                if 'type' in metadata.keys() and metadata['type']=='tablesarray':
+                    print "It is an array 2"
+                    single_parameters[attr.name] = get_tablesarray_values(res.value.value, metadata)
+
+
+                elif res.value.type == 'array' and metadata['single'] == 'yes':
+                    single_parameters[attr.name] =json.loads (res.value.value)
 
         complex_attributes={}
         for attr_ in aggregated_attributes:
@@ -258,6 +274,17 @@ class Node(dict):
         else:
             self.position['geographic'] = geographic
         nodes_parameters[self.name]=attributes
+
+
+def get_tablesarray_values(value, metadata):
+    values={}
+    for key in metadata.keys():
+        if key =='user_id' or key =='single':
+            continue
+        values[key]=metadata[key]
+    values['url'] = value
+    return values
+
 
 def get_timesreies_values(value, column, metadata):
 
@@ -377,7 +404,7 @@ class Recorder(object):
                 self.node = value[1]
                 self.type = value[0]
 
-def get_records(network, attributes_ids, resourcescenarios_ids):
+def get_recotds(network, attributes_ids, resourcescenarios_ids):
     global has_tablerecorder
     for attr_ in network.attributes:
         attr = attributes_ids[attr_.attr_id]
@@ -423,13 +450,15 @@ class Metadata (object):
     def __init__(self, network, resourcescenarios_ids, attributes_ids):
        self.title=network.name
        for attr_ in network.attributes:
-           attr = attributes_ids[attr_.attr_id]
+           attr     = attributes_ids[attr_.attr_id]
            res = resourcescenarios_ids[attr_.id]
            if (attr.name == 'author'):
                self.author = res.value.value
            if (attr.name == 'minimum_version'):
                self.minimum_version = res.value.value
-       self.description=network.description
+       if hasattr(network, "description"):
+           self.description=network.description
+
 
 def get_dict(obj):
     if type(obj) is list:
@@ -519,10 +548,8 @@ def get_parameters_refs(nodes):
     return  parameters
 
 def pywrwriter (network, attrlist, output_file, steps):
-
+    json_file__folder=os.path.dirname(output_file)
     write_progress(4, steps)
-
-    target_dir=os.path.dirname(output_file)
 
     nodes=[]
     edges=[]
@@ -533,8 +560,8 @@ def pywrwriter (network, attrlist, output_file, steps):
     resourcescenarios_ids=get_resourcescenarios_ids(network.scenarios[0].resourcescenarios)
     timestepper=Timestepper(network, attributes_ids, resourcescenarios_ids)
     metadata = Metadata(network, resourcescenarios_ids, attributes_ids)
-    get_records(network, attributes_ids, resourcescenarios_ids)
-    
+    get_recotds(network, attributes_ids, resourcescenarios_ids)
+    #get_recotds(network, attributes_ids, resourcescenarios_ids)
     domains=[]
     for attr_ in network.attributes:
         attr = attributes_ids[attr_.attr_id]
@@ -548,11 +575,14 @@ def pywrwriter (network, attrlist, output_file, steps):
     solver = Solver(network, attributes_ids, resourcescenarios_ids)
     nodes_id_name={}
     for node_ in network.nodes:
+        if node_.name=='agg':
+            print "=======>", node_
         node=Node(node_, attributes_ids, resourcescenarios_ids)
         nodes_id_name[node_.id]=node_.name
         nodes.append(node)
     #need to be done check parameters refs for the new pywr format
     parameters=get_parameters_refs(nodes)
+    print parameters
 
     for link_ in network.links:
         edge=Edge(link_, attributes_ids, resourcescenarios_ids, nodes_id_name)
@@ -560,22 +590,31 @@ def pywrwriter (network, attrlist, output_file, steps):
     for node in nodes:
         for i in range(0, len(node.__dict__.keys())):
             k = node.__dict__.keys()[i]
+            print node.name, k
             if (k.lower() != 'name' and k.lower() != 'type' and k.lower() != 'position'):
                 value=node.__dict__.values()[i]
+
                 if type(value) is dict:
                     if value['type'] == 'arrayindexed' or value['type'] == 'dailyprofile' or value['type'] == 'dataframe':
                         file_name=node.name+"_"+k+'.csv'
-                        write_time_series_tofile(value['url'], os.path.join(target_dir, file_name))
+                        write_time_series_tofile(value['url'], os.path.join(json_file__folder, file_name))
                         value['url']=file_name
 
     for k in parameters:
         value=parameters[k]
 
         if type(value) is dict and 'type' in value.keys():
+
             if value['type'] == 'arrayindexed' or value['type'] == 'dailyprofile':
                 file_name = node.name + "_" + k + '.csv'
-                write_time_series_tofile(value['url'], os.path.join(target_dir, file_name))
+                write_time_series_tofile(value['url'], os.path.join(json_file__folder, file_name))
                 value['url'] = file_name
+            else:
+                if value['type'] == 'tablesarray':
+                     file_name=node.name+"_"+k+'.h5'
+                     write_tablesarray_to_hdf(os.path.join(json_file__folder, file_name), value['where'], value['node'], value['url'])
+                     value['url'] = file_name
+
     write_progress(5, steps)
 
     pywrNetwork=PywrNetwork(metadata, timestepper, solver, nodes, edges, domains, parameters,  recorders)
