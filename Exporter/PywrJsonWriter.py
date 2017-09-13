@@ -327,7 +327,8 @@ def get_timesreies_values(value, column, metadata):
             values['parse_dates']=False
 
     if ('index_col' in metadata.keys()):
-        values['index_col'] = int(metadata['index_col'])
+        print ("Index===>", metadata['index_col'])
+        values['index_col'] = (metadata['index_col'])
 
     if ('dayfirst' in metadata.keys()):
         values['dayfirst'] = metadata['dayfirst']

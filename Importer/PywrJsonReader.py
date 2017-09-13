@@ -373,6 +373,7 @@ def read_tablesarray(url, root, data_node):
 
 def read_timeseries(url, name,  sheetname, column=None):
     ss= os.path.dirname(url)
+    print "File ====>", ss, "url:", url
     if(ss == ''):
         url=os.path.join(json_file__folder[0], url)
     values_ = read_data_file_column(url, name, column, sheetname)
@@ -460,14 +461,14 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
     metadata['single'] = 'yes'
     print (type(value_),"_toz=====>", value_)
     try:
-        print "Value type:===>>", value_['type']
-        print name
+        print ("Value type:===>>", value_['type'])
+        print (name)
     except:
-        print "No type found"
-    print name
-    print _type
-    print "Res attr: ",type(res_attributes), get_dict(res_attributes)
-    print "======================================================================"
+        print ("No type found")
+    print (name)
+    print (type)
+    print ("Res attr: ",type(res_attributes), get_dict(res_attributes))
+    print ("======================================================================")
 
     if type(value_) is dict:
         keys_=value_.keys()
@@ -533,14 +534,15 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
                     value=read_tablesarray(value_['url'], value_['where'] ,value_['node'])
                     attr_type = 'array'
                 else:
-                    print "------------------------>", value_.type.lower()
+                    #print "------------------------>", value_.type.lower()
                     attr_type = 'timeseries'
                     sheetname=None
                     if 'sheetname' in keys_:
                         sheetname=value_['sheetname']
                     if  "column" in value_:
-                        value = read_timeseries(value_['url'],sheetname,  name, value_['column'])
-                        metadata['column']=value_['column']
+                       url=os.path.join(json_file__folder[0], value_['url'])
+                       value = read_timeseries(url,sheetname,  name, value_['column'])
+                       metadata['column']=value_['column']
                     else:
                         value = read_timeseries(value_['url'], name, sheetname)
                 if  "parse_dates" in keys_:
@@ -724,7 +726,7 @@ def get_controlcurveinterpolated_attributes(value_, name, counter, attributes_, 
     type = 'array'
     metadata = {}
     metadata['single'] = 'no'
-    print value_, "=====================>>>>>"
+    print (value_, "=====================>>>>>")
     if "comment" in value_:
         metadata['comment'] = value_['comment']
 
@@ -803,8 +805,7 @@ def test_for_invalid_keys_names(json_string):
         elif (type(main_json[key]) is dict):
             print main_json[key]
 
-    import sys
-    #sys.exit(0)
+
 
 def import_net (filename, connector):
         has_tablerecorder = False
@@ -915,7 +916,7 @@ def import_net (filename, connector):
         i = 0
         for json_ in json_list:
             print "Parameters section is found...."
-            print json_['parameters'].keys()
+            #print json_['parameters'].keys()
             if ("parameters" in json_):
                 for i in range(0, len(json_['parameters'].keys())):
                     k = json_['parameters'].keys()[i]
