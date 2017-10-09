@@ -174,6 +174,8 @@ class Node(dict):
                 attr = attributes_ids[attr_.attr_id]
                 if has_tablerecorder == True and attr.name=='mean_flow':
                     continue
+                if attr_.id not in resourcescenarios_ids.keys():
+                    continue
                 res = resourcescenarios_ids[attr_.id]
                 metadata = json.loads(res.value.metadata)
                 dic={}
@@ -190,6 +192,8 @@ class Node(dict):
                 continue
             attr=attributes_ids[attr_.attr_id]
             print self.name, get_dict(attr)
+            if attr_.id not in resourcescenarios_ids.keys():
+                continue
             res=resourcescenarios_ids[attr_.id]
             metadata = json.loads(res.value.metadata)
             print metadata, res.value.value
@@ -519,6 +523,8 @@ def get_parameters_refs(nodes):
             attrs=nodes_parameters[node.name]
             attrs_ = nodes_parameters[node_.name]
             for attr in attrs.keys():
+                if attr=='factors':
+                    continue
                 for attr_ in attrs_.keys():
                     if(attr==attr_):
                         if hasattr(attrs[attr], "type") and hasattr(attrs_[attr_],'type'):
@@ -533,14 +539,15 @@ def get_parameters_refs(nodes):
                                         if (not attr+'_ref' in parameters):
                                             parameters[attr]={'type': attrs[attr] ['type'], 'values':attrs_[attr_]['values']}
                         else:
-                            if attrs[attr] == attrs_[attr_]:
+                            if attrs[attr] == attrs_[attr_] and attr_ != 'factors':
                                 if(not attr+'_ref' in parameters ):
                                     parameters[attr+'_ref' ]= {"type": "constant","values": attrs[attr]}
 
     for node in nodes:
         for key in node.__dict__.keys():
             for attr in parameters.keys():
-                if attr == key+'_ref':
+                print ("key, attr: ", key, attr)
+                if attr.lower() == (key+'_ref').lower():
                     if parameters[attr]== node.__dict__[key]:
                         node.__dict__[key]=attr
 

@@ -75,6 +75,7 @@ class Node(object):
         print ("====>", type(node_))
         self.name = node_['name']
         self.type = node_['type']
+
         for recorder in recorders:
             dict=get_dict(recorder)
             if('node' in dict.keys()):
@@ -1004,7 +1005,6 @@ def import_net (filename, connector):
         NetworkSummary = connector.call('add_network', {'net': get_dict(network)})
         set_resource_types(nodes_types, links_types, network.type, NetworkSummary, connector)
         return NetworkSummary
-
 
 
 '''
