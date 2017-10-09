@@ -26,7 +26,6 @@ def get_dict(obj):
         result[key] = element
     return result
 
-
 def load_model(file_name):
     model = Model.load(file_name)
     #start= pandas.to_datetime(model.timestepper.start)
@@ -57,7 +56,6 @@ def load_model(file_name):
                 '''
                 file.write(record.name+ ",csvrecorder,"+record.csvfile+"\n")
             elif hasattr(record, "h5file"):
-
                 file.write(record.name + ",tablesrecorder," + record.h5file + "\n")
             else:
                 if hasattr(record, 'node'):

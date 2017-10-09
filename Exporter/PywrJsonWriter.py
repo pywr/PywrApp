@@ -287,7 +287,6 @@ def get_tablesarray_values(value, metadata):
 
 
 def get_timesreies_values(value, column, metadata):
-
     if('type' in metadata.keys()):
         type_ = metadata['type']
     else:
@@ -332,7 +331,6 @@ def get_timesreies_values(value, column, metadata):
 
     if ('dayfirst' in metadata.keys()):
         values['dayfirst'] = metadata['dayfirst']
-
 
     values['type'] = type_
     values['url']=contents

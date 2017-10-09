@@ -159,6 +159,7 @@ class Network (object):
         global has_tablerecorder
         attributes_={}
         self.project_id=project_id
+        self.type='PywrNetwork'
         author=None
         minimum_version=None
         if(metadata !=None):
@@ -815,6 +816,8 @@ def import_net (filename, connector):
         recorders=[]
         domains=[]
         project_attributes = {}
+        nodes_types={}
+        links_types={}
         pp= dict(
         name="CSV import at %s" ,
         description= \
@@ -930,6 +933,7 @@ def import_net (filename, connector):
                     print "2", len(ref_parameters)
 
         for node_ in main_json['nodes']:
+
             node_records=[]
             print "recorders", (get_dict(recorders))
             for rec in recorders:
@@ -939,7 +943,15 @@ def import_net (filename, connector):
                     if rec.node==node_['name']:
                          node_records.append(rec)
 
+
             node = Node(node_, counter, nodes_attributes, node_records)
+            print ("Name: ", node.name, node.type, nodes_types)
+            if node.type in nodes_types.keys():
+                print ">>>======>>>>", nodes_types
+                nodes_types[node.type].append(node.name)
+            else:
+                nodes_types[node.type] = [node.name]
+
             nodes_ids[node_['name']] = node.id
             counter.id = counter.id - 1
             network.nodes.append(node)
@@ -952,6 +964,10 @@ def import_net (filename, connector):
 
         for edge_ in main_json['edges']:
            link=Link(edge_, nodes_ids, counter, links_attributes)
+           if link.type not in links_types:
+               links_types[link.type]=[link.name]
+           else:
+               links_types[link.type].append(link.name)
            counter.id = counter.id - 1
            network.links.append(link)
            for attr_name in links_attributes[link.name].keys():
@@ -986,5 +1002,72 @@ def import_net (filename, connector):
         print "project: ", project_attributes.keys()
 
         NetworkSummary = connector.call('add_network', {'net': get_dict(network)})
-        #print ("NETWORK:/n", get_dict(network))
+        set_resource_types(nodes_types, links_types, network.type, NetworkSummary, connector)
         return NetworkSummary
+
+
+
+'''
+This function has be token from ImportCSV.py and has been modified to work with the app
+'''
+def set_resource_types(nodes_types, links_types, networktype, NetworkSummary, connection):
+    template_file='..\PywrNetwork.xml'
+    print("Setting resource types based on %s." % template_file)
+    with open(template_file) as f:
+        xml_template = f.read()
+
+    template = connection.call('upload_template_xml', {'template_xml':xml_template})
+
+    type_ids = {}
+    warnings = []
+
+    for type_name in nodes_types:
+        for tmpltype in template.get('types', []):
+            if tmpltype['name'] == type_name:
+                type_ids.update({tmpltype['name']: tmpltype['id']})
+                break
+
+    for type_name in links_types:
+        for tmpltype in template.get('types', []):
+            if tmpltype['name'] == type_name:
+                type_ids.update({tmpltype['name']: tmpltype['id']})
+                break
+
+
+    for tmpltype in template.get('types', []):
+        if tmpltype['name'] == networktype:
+            type_ids.update({tmpltype['name']: tmpltype['id']})
+            break
+
+    args = []
+
+    if networktype == '':
+        warnings.append("No network type specified")
+    elif type_ids.get(networktype):
+        args.append(dict(
+            ref_key = 'NETWORK',
+            ref_id  = NetworkSummary['id'],
+            type_id = type_ids[networktype],
+        ))
+    if NetworkSummary.get('nodes', []):
+        for node in NetworkSummary['nodes']:
+            for typename, node_name_list in nodes_types.items():
+                if type_ids[typename] and node.name in node_name_list:
+                    args.append(dict(
+                        ref_key = 'NODE',
+                        ref_id  = node.id,
+                        type_id = type_ids[typename],
+                    ))
+
+    if NetworkSummary.get('links', []):
+        for link in NetworkSummary['links']:
+            for typename, link_name_list in links_types.items():
+                if type_ids[typename] and link['name'] in link_name_list:
+                    args.append(dict(
+                        ref_key = 'LINK',
+                        ref_id  = link['id'],
+                        type_id = type_ids[typename],
+                    ))
+
+
+    connection.call('assign_types_to_resources', {'resource_types':args})
