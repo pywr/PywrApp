@@ -9,7 +9,6 @@ from numpy import array
 from HydraLib.HydraException import HydraPluginError
 
 def check_file(url):
-    print ("uuu====>", url)
     if os.path.exists(url) == False:
         raise HydraPluginError("File: " + url + ' is not found !!!')
 

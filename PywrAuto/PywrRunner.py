@@ -43,18 +43,10 @@ def load_model(file_name):
         file.write("timeStep," + str(timeStep) + '\n')
         file.write("rec_name, rec_type, res name, type, value/s\n")
         for record in model.recorders:
-            #print ("===============================================>")
-            print ("Rec ===>",get_dict(record))
-            #print ("===============================================>")
             if hasattr(record, "csvfile"):
-                '''
-                if hasattr(record, 'node_names'):
-                    line = record.name+ ",csvrecorder"
-                    for node_name in record.node_names:
-                        line = line + ',' + node_name
-                    file.write(line)
-                '''
                 file.write(record.name+ ",csvrecorder,"+record.csvfile+"\n")
+            elif hasattr(record, "url"):
+                file.write(record.name + ",csvrecorder," + record.url + "\n")
             elif hasattr(record, "h5file"):
                 file.write(record.name + ",tablesrecorder," + record.h5file + "\n")
             else:
@@ -79,6 +71,5 @@ if __name__ == '__main__':
     args=sys.argv
     if len(args)>1:
         filename=str(args[1])
-        print ("====>", filename)
         if filename != None:
             load_model(filename)

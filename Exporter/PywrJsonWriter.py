@@ -122,7 +122,6 @@ def adjuest_parameters(complex_attrinbtes):
     to_be_deleted=[]
     for attr_name in complex_attrinbtes.keys():
         attr=complex_attrinbtes[attr_name]
-        print "attr.type", attr.type
 
         if (attr.type == 'controlcurveindex'):
             for item in attr.control_curves:
@@ -178,25 +177,23 @@ class Node(dict):
                     continue
                 res = resourcescenarios_ids[attr_.id]
                 metadata = json.loads(res.value.metadata)
-                dic={}
-                recorders[attr.name] =dic
-                dic["node"]=node_.name
-                for key in metadata.keys():
-                    if key=="user_id":
-                        continue
-                    if key == 'timesteps':
-                        dic[key] = int(metadata[key])
-                    else:
-                        dic[key] = metadata[key]
-
+                if 'type' in metadata:
+                    dic={}
+                    recorders[attr.name] =dic
+                    dic["node"]=node_.name
+                    for key in metadata.keys():
+                        if key=="user_id":
+                            continue
+                        if key == 'timesteps':
+                            dic[key] = int(metadata[key])
+                        else:
+                            dic[key] = metadata[key]
                 continue
             attr=attributes_ids[attr_.attr_id]
-            print self.name, get_dict(attr)
             if attr_.id not in resourcescenarios_ids.keys():
                 continue
             res=resourcescenarios_ids[attr_.id]
             metadata = json.loads(res.value.metadata)
-            print metadata, res.value.value
             if(metadata ['single']=='no'):
                 aggregated_attributes.append(attr_)
                 continue
@@ -214,7 +211,6 @@ class Node(dict):
                     vals['value']=float(res.value.value)
                     single_parameters[attr.name] =vals#float(res.value.value)
                 else:
-                    print "From here.."
                     single_parameters[attr.name] = float(res.value.value)
 
             elif res.value.type == 'timeseries' and metadata['single']== 'yes':
@@ -226,9 +222,7 @@ class Node(dict):
                                                                          json.loads(res.value.metadata))
 
             elif res.value.type == 'array' and metadata['single'] == 'yes':
-                print "It is an array 1"
                 if 'type' in metadata.keys() and metadata['type']=='tablesarray':
-                    print "It is an array 2"
                     single_parameters[attr.name] = get_tablesarray_values(res.value.value, metadata)
 
 
@@ -330,7 +324,6 @@ def get_timesreies_values(value, column, metadata):
             values['parse_dates']=False
 
     if ('index_col' in metadata.keys()):
-        print ("Index===>", metadata['index_col'])
         values['index_col'] = (metadata['index_col'])
 
     if ('dayfirst' in metadata.keys()):
@@ -344,7 +337,6 @@ def get_timesreies_values(value, column, metadata):
     return values
 
 def write_time_series_tofile(contents, filename):
-    print "File name ======>", filename
     file = open(filename, "w")
     file.write("".join(contents))
     file.close()
@@ -495,6 +487,7 @@ class PywrNetwork (object):
         self.edges=edges
         self.domains=domains
         self.parameters=parameters
+        print "TTTTTTTTTTTT", recorders
         self.recorders=recorders
 
     def get_json(self):
@@ -546,7 +539,6 @@ def get_parameters_refs(nodes):
     for node in nodes:
         for key in node.__dict__.keys():
             for attr in parameters.keys():
-                print ("key, attr: ", key, attr)
                 if attr.lower() == (key+'_ref').lower():
                     if parameters[attr]== node.__dict__[key]:
                         node.__dict__[key]=attr
@@ -581,14 +573,11 @@ def pywrwriter (network, attrlist, output_file, steps):
     solver = Solver(network, attributes_ids, resourcescenarios_ids)
     nodes_id_name={}
     for node_ in network.nodes:
-        if node_.name=='agg':
-            print "=======>", node_
         node=Node(node_, attributes_ids, resourcescenarios_ids)
         nodes_id_name[node_.id]=node_.name
         nodes.append(node)
     #need to be done check parameters refs for the new pywr format
     parameters=get_parameters_refs(nodes)
-    print parameters
 
     for link_ in network.links:
         edge=Edge(link_, attributes_ids, resourcescenarios_ids, nodes_id_name)
@@ -596,7 +585,6 @@ def pywrwriter (network, attrlist, output_file, steps):
     for node in nodes:
         for i in range(0, len(node.__dict__.keys())):
             k = node.__dict__.keys()[i]
-            print node.name, k
             if (k.lower() != 'name' and k.lower() != 'type' and k.lower() != 'position'):
                 value=node.__dict__.values()[i]
 

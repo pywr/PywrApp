@@ -80,18 +80,15 @@ def check_args(args):
     except (TypeError, ValueError):
         raise HydraPluginError('No senario is specified')
 
-    try:
-        output = os.path.dirname(args.output)
-        args.output="c:\\temp\\test.json"
-        if args.output == '':
-            output = '.'
-
+    output = args.output
+    if output!=None:
         if  os.path.exists(args.output)==False:
             raise HydraPluginError('Output file directory '+
-                                   os.path.dirname(args.output)+
-                                   'does not exist')
-    except:
-        output ="network_"+args.network_id+".json"
+                               os.path.dirname(args.output)+
+                               'does not exist')
+    else:
+        output = "network_" + args.network_id + ".json"
+
     return output
 
 
@@ -148,12 +145,6 @@ class PywrExporter(JSONPlugin):
                                                    'scenario_ids': [self.scenario_id]})
         self.attrlist = self.connection.call('get_all_attributes', {})
 
-def export_pywr_network(pywrexporter, args, outputfile, steps):
-
-    pywrwriter(pywrexporter.net, pywrexporter.attrlist, outputfile, steps)
-    return "Data export was successful."
-
-
 def check_output_file(results_file, start_time):
     if os.path.isfile(results_file) == False:
         raise HydraPluginError('No Output file is found ('+results_file+')')
@@ -171,7 +162,7 @@ def run_pywr_model(file_name):
     proc.wait()
 
 
-def import_results(results_file, network):
+def import_results(results_file, network, nodes_vars):
     csvfile=None
     varaiables_records=[]
     with open(results_file, 'r') as res:
@@ -187,7 +178,6 @@ def import_results(results_file, network):
             end_date=line[1]
         elif line[0]=="timeStep":
             timeStep=line[1]
-
         else:
             rec_name=line[0]
             rec_type=line[1]
@@ -202,21 +192,21 @@ def import_results(results_file, network):
                 continue
             if rec_type=="csvrecorder":
                 csvfile=res
-                get_csvrecorder_varaiables(csvfile, varaiables_records, start_date, end_date, timeStep)
+                get_csvrecorder_varaiables(csvfile, varaiables_records, start_date, end_date, timeStep, nodes_vars)
                 continue
 
             elif rec_type =="tablesrecorder":
                 h5file = res
-                get_tablesrecorder_varaiables(h5file, varaiables_records, network,  start_date, end_date, timeStep)
+                get_tablesrecorder_varaiables(h5file, varaiables_records, network,  start_date, end_date, timeStep, nodes_vars)
                 continue
-            var = varaiable_record(rec_name, res, value, start_date, end_date, timeStep)
+            var = varaiable_record(nodes_vars[rec_name], res, value, start_date, end_date, timeStep)
 
             varaiables_records.append(var)
 
     return varaiables_records
 
 
-def get_csvrecorder_varaiables(csvfile, varaiables_records, start_date, end_date, timeStep):
+def get_csvrecorder_varaiables(csvfile, varaiables_records, start_date, end_date, timeStep, nodes_vars):
     with open(csvfile, 'r') as res:
         contents_ = res.read()
     contents=contents_.split('\n')
@@ -227,15 +217,16 @@ def get_csvrecorder_varaiables(csvfile, varaiables_records, start_date, end_date
         for j in range(1, len(contents)-1):
             line=contents[j].split(',')
             values.append(line[i])
-            var = varaiable_record('mean_flow', res_name, values, start_date, end_date, timeStep)
-        varaiables_records.append(var)
+        if res_name in nodes_vars:
+            var = varaiable_record(nodes_vars[res_name], res_name, values, start_date, end_date, timeStep)
+            varaiables_records.append(var)
 
-def get_tablesrecorder_varaiables(h5file, varaiables_records, network, start_date, end_date, timeStep):
+def get_tablesrecorder_varaiables(h5file, varaiables_records, network, start_date, end_date, timeStep,nodes_vars):
     store=get_h5DF_store(h5file)
     for node in network.nodes:
         values=get_node_attr_values(store, node.name)
         if values !=None:
-            var = varaiable_record('mean_flow', node.name, values, start_date, end_date, timeStep)
+            var = varaiable_record(nodes_vars[node.name], node.name, values, start_date, end_date, timeStep)
             varaiables_records.append(var)
         else:
             continue
@@ -252,6 +243,7 @@ def import_vars(network, varaiables_records, attrlist):
     res_scenario = network.scenarios[0].resourcescenarios
     nodes = dict()
     metadata = {}
+    print "LENGTH:", len(varaiables_records)
     for varaiable_record in varaiables_records:
         for node in network.nodes:
             if node.name.lower().strip() == varaiable_record.res.lower().strip():
@@ -260,8 +252,14 @@ def import_vars(network, varaiables_records, attrlist):
                     if attr_.attr_is_var == 'Y':
                         attr = attrs[attr_.attr_id]
                         if attr== varaiable_record.rec_name:
-                            res = resourcescenarios_ids[attr_.id]
-                            metadata = json.loads(res.value.metadata)
+                            if attr_.id not in resourcescenarios_ids:
+                                metadata = {}
+                                #continue
+                            else:
+                                res = resourcescenarios_ids[attr_.id]
+                                metadata = json.loads(res.value.metadata)
+                            #else:
+                            #    metadata={}
                             dataset = dict(name='Pywr import - ' + varaiable_record.rec_name, )
                             dataset['unit'] = '-'
                             dataset['type'] = varaiable_record.type
@@ -277,6 +275,17 @@ def import_vars(network, varaiables_records, attrlist):
 def save(network, connection):
     connection.call('update_scenario', {'scen': network.scenarios[0]})
 
+
+def get_nodes_vars(network):
+    nodes_vars_types = {'output': 'received_water', 'storage': 'storage', 'link': 'flow','reservoir':'storage'}
+    nodes_vars={}
+    for node in network.nodes:
+        type_=node.types[0]['name']
+        if type_=='catchment' or type_=='AggregatedNode':
+            continue
+        nodes_vars[node.name]=nodes_vars_types[type_]
+    return nodes_vars
+
 if __name__ == '__main__':
     text ="Done"
     errors  = []
@@ -290,10 +299,9 @@ if __name__ == '__main__':
         outputfile=check_args(args)
         pywrexporter = PywrExporter(args)
         write_progress(3, steps)
-
-        export_pywr_network(pywrexporter, args, outputfile, steps)
+        pywrwriter(pywrexporter.net, pywrexporter.attrlist, outputfile, steps)
         write_progress(7, steps)
-
+        nodes_vars=get_nodes_vars(pywrexporter.net)
         start_time = datetime.now().replace(microsecond=0)
         write_progress(8, steps)
 
@@ -303,9 +311,8 @@ if __name__ == '__main__':
         results_file = outputfile + ".csv"
         write_progress(10, steps)
 
-
         check_output_file(results_file, start_time)
-        varaiables_records=import_results(results_file, pywrexporter.net)
+        varaiables_records=import_results(results_file, pywrexporter.net, nodes_vars)
         write_progress(11, steps)
 
         import_vars(pywrexporter.net, varaiables_records, pywrexporter.attrlist)

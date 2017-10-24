@@ -61,7 +61,7 @@ class RecourseAttribute (object):
         self.value=value_
 
 class Node(object):
-    def __init__(self, node_, counter, nodes_attributes, recorders):
+    def __init__(self, node_, counter, nodes_attributes, recorders, nodes_vars_types):
         global  has_tablerecorder
         is_flow=True
         attributes_ = {}
@@ -72,7 +72,6 @@ class Node(object):
         i=0
         self.id = counter.id
         self.status = "A"
-        print ("====>", type(node_))
         self.name = node_['name']
         self.type = node_['type']
 
@@ -103,10 +102,9 @@ class Node(object):
             self.x = str(random.randint(0,99))
         if(self.y==None):
             self.y = str(random.randint(0,99))
-        print ("====>",node_)
+
 
         keys_=sorted(node_.keys())
-        print "Node keys: ", keys_
 
         for i in range(0, len(keys_)):#.__dict__.keys())):
             k=keys_[i]
@@ -114,18 +112,21 @@ class Node(object):
                 val=node_[k]
                 if k=='flow':
                     is_flow=False
-                print "___________________--------------------->",  self.name
-                print k
+
                 get_attribute_type_and_value(val, k, counter, attributes_, 'input', self.attributes)
-        if is_flow == True and has_tablerecorder==True:
-            get_variable_attribute_type_and_value('NULL', 'mean_flow', counter, attributes_, 'output', {}, self.attributes)
+        #if self.type in nodes_vars_types:
+        #    get_variable_attribute_type_and_value('NULL', nodes_vars_types[self.type], counter, attributes_, 'output', {},
+        #                                          self.attributes)
+
+        #if is_flow == True and has_tablerecorder==True:
+        #    get_variable_attribute_type_and_value('NULL', 'mean_flow', counter, attributes_, 'output', {}, self.attributes)
 
 
 
 
         get_attribute_type_and_value(node_['type'], 'node_type', counter, attributes_, 'input', self.attributes)
         nodes_attributes [self.name]= attributes_
-        print get_dict(attributes_)
+
 
 class Link(object):
     def __init__(self, edge_, nodes_ids, counter, links_attributes):
@@ -238,25 +239,21 @@ class Network (object):
         recorders_list=[]
         metadata_={}
         for recorder in recorders:
-                if recorder.name.lower().strip()=="database" and not hasattr(recorder, "node"):
-                    dic=get_dict(recorder)
-                    print "RECODER IS FOUND ...................", recorder.name
-                    print dic.keys()
-                    metadata={}
-                    for key in dic:
-                        if key!="name":
-                            metadata[key]=dic[key]
-                    '''
-                    recorders_list.append(recorder.name)
-                    for k in dic.keys():
-                        if(k !='name'):
-                            metadata_[recorder.name+'@'+k]=str(dic[k])
-                    '''
-                    counter.id = counter.id - 1
-                    attributes_['recorder'] = AttributeData("descriptor", "database", '-', 'Dimensionless', metadata)
-                    self.attributes.append(ResourceAttr(counter.id, "recorder", 'Input'))
-                    recourseAttributea.append(RecourseAttribute('NETWORK', counter.id, 'recorder', attributes_['recorder'], 'Dimensionless'))
-                    has_tablerecorder=True
+            print "Rec ====>", get_dict(recorder)
+            if (recorder.name.lower().strip()=="database" or recorder.type=='CSVRecorder') and not hasattr(recorder, "node"):
+                dic=get_dict(recorder)
+                print "2. Rec ====>", get_dict(recorder)
+
+                metadata={}
+                for key in dic:
+                    if key!="name":
+                        metadata[key]=dic[key]
+
+                counter.id = counter.id - 1
+                attributes_['recorder'] = AttributeData("descriptor", "database", '-', 'Dimensionless', metadata)
+                self.attributes.append(ResourceAttr(counter.id, "recorder", 'Input'))
+                recourseAttributea.append(RecourseAttribute('NETWORK', counter.id, 'recorder', attributes_['recorder'], 'Dimensionless'))
+                has_tablerecorder=True
         network_attributes[self.name] = attributes_
 
 class Scenario(object):
@@ -279,7 +276,6 @@ class Resourcescenario(object):
 
 class AttributeData (object):
     def __init__(self,  type, value, unit, dimen, metadata=None):
-        print "Type: ", type
         self.hidden='N'
         self.type=type
         self.name = 'pywerApp'
@@ -375,7 +371,6 @@ def read_tablesarray(url, root, data_node):
 
 def read_timeseries(url, name,  sheetname, column=None):
     ss= os.path.dirname(url)
-    print "File ====>", ss, "url:", url
     if(ss == ''):
         url=os.path.join(json_file__folder[0], url)
     values_ = read_data_file_column(url, name, column, sheetname)
@@ -433,7 +428,6 @@ def read_seasonall(values_):
 
             values[str(dat)] = lin[value_index]
     else:
-        print "vaues____:", (values_.keys())
         keys_=values_.keys()
         for v in values_['values']:
             dat=datetime.datetime(year, month, day)
@@ -461,16 +455,6 @@ def get_variable_attribute_type_and_value(value_, name, counter, attributes_, _t
 def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_attributes=None):
     metadata = {}
     metadata['single'] = 'yes'
-    print (type(value_),"_toz=====>", value_)
-    try:
-        print ("Value type:===>>", value_['type'])
-        print (name)
-    except:
-        print ("No type found")
-    print (name)
-    print (type)
-    print ("Res attr: ",type(res_attributes), get_dict(res_attributes))
-    print ("======================================================================")
 
     if type(value_) is dict:
         keys_=value_.keys()
@@ -486,31 +470,21 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
         attr_type = 'scalar'
         if  "attr_type" in keys_:
             metadata['attr_type']=value_['type']
-            print name, value_
     except:
-        print "It is failed ......"
-        print name
-        print value_
         if isinstance(value_, list):
-            print "It is failed ......1"
             attr_type = "array"
             value = json.dumps(value_)
         elif isinstance(value_, basestring):
-            print "It is failed ......2", name, value_
             attr=is_in_dict(value_, ref_parameters)
             if attr != None:
-                print "Reference is foun ..."
-                print get_dict((attr))
             #if(value_ in ref_parameters.keys()):
                 #toz   toz
                 #attr = ref_parameters[value_]
                 attr_type = attr.type
                 value = attr.value
                 metadata=json.loads(attr.metadata)
-                print "Metadata: ", metadata
                 if( 'type' in metadata.keys()):
                     if(metadata['type']=='aggregated'):
-                        print "From aggregated section"
                         get_aggregated(json.loads(value), counter, attributes_, _type, res_attributes)
                     elif(metadata['type']=='indexedarray'):
                         get_aggregated(json.loads(value), counter, attributes_, _type, res_attributes)
@@ -523,7 +497,6 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
                 value=value_
                 attr_type='descriptor'
         elif "type" in keys_:
-            print "It is failed ......3"
             metadata['type'] = value_['type'].lower()
             if value_['type'].lower() =='constant':
                 value = str(value_['value'])
@@ -536,7 +509,6 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
                     value=read_tablesarray(value_['url'], value_['where'] ,value_['node'])
                     attr_type = 'array'
                 else:
-                    #print "------------------------>", value_.type.lower()
                     attr_type = 'timeseries'
                     sheetname=None
                     if 'sheetname' in keys_:
@@ -563,7 +535,6 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
                 if "parse_dates" in keys_:
                     metadata['parse_dates'] = str(value_['parse_dates'])
             elif value_['type'].lower() == 'aggregated':
-                print "It is aggregated .."
                 get_aggregated_attribute(value_, name, counter, attributes_, _type, res_attributes)
                 return
             elif value_['type'].lower() == 'indexedarray':
@@ -571,16 +542,12 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
 
                 return
             elif value_['type'].lower() == 'controlcurveindex':
-                print "== == == == == == = >> >> > controlcurveindex"
                 get_controlcurveindex_attributes(value_, name, counter, attributes_, _type, res_attributes)
-                print "DONEW .......", res_attributes
                 return
             elif value_['type'].lower() =='monthlyprofilecontrolcurve':
-                print ("It is monthlyprofilecontrolcurve")
                 get_monthlyprofilecontrolcurve_attributes(value_, name, counter, attributes_, _type, res_attributes)
                 return
             elif value_['type'].lower() == 'controlcurveinterpolated':
-
                 get_controlcurveinterpolated_attributes(value_, name, counter, attributes_, _type, res_attributes)
                 return
             elif value_['type'].lower() == 'recorderthreshold':
@@ -589,13 +556,11 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
 
     if "comment" in keys_:
         metadata['comment']=value_['comment']
-    print "____value====>>>>", value_
     counter.id = counter.id - 1
     attributes_[name] = AttributeData(attr_type, value, '-', 'Dimensionless', metadata)
     if(res_attributes!=None):
         res_attributes.append(ResourceAttr(counter.id, name, _type))
         recourseAttributea.append(RecourseAttribute('NODE', counter.id, name , attributes_[name],'Dimensionless'))
-
 
 def is_in_dict(key_, dict_):
     for k in dict_.keys():
@@ -604,8 +569,6 @@ def is_in_dict(key_, dict_):
     return None
 
 def get_aggregated_attribute(value_, name, counter, attributes_, _type, res_attributes=None):
-    print "hello from It is aggregated .."
-    print json.dumps(value_['parameters'])
     metadata={}
     type = 'array'
     value = json.dumps(value_['parameters'])
@@ -623,9 +586,7 @@ def get_aggregated_attribute(value_, name, counter, attributes_, _type, res_attr
     get_aggregated (json.loads(attributes_[name].value), counter, attributes_,_type,  res_attributes)
 
 def get_aggregated(paras, counter, attributes_, _type, res_attributes):
-    print "From aggg function ....."
     for para in paras:
-        print "Parameter: ", para
         get_attribute_type_and_value(para, para, counter, attributes_, _type, res_attributes)
 
 def get_indexedarray_attributes(value_, name, counter, attributes_, _type, res_attributes=None):
@@ -664,9 +625,7 @@ def get_controlcurveindex_attributes(value_, name, counter, attributes_, _type, 
     type='array'
     metadata ['type'] = 'controlcurveindex'
     metadata['single'] = 'no'
-    print " == == = >> >> > controlcurveindex", value_
     if "storage_node" in value_:
-        print "Storage node is found ", value_["storage_node"]
         metadata['storage_node']=value_["storage_node"]
     if "comment" in value_:
         metadata['comment'] = value_['comment']
@@ -676,8 +635,6 @@ def get_controlcurveindex_attributes(value_, name, counter, attributes_, _type, 
     attr = AttributeData(type, json.dumps(value), '-', 'Dimensionless', metadata)
     counter.id = counter.id - 1
     attributes_[name] = attr
-    print name, "Attr ibut is: ",get_dict(attr)
-    print "recourseAttributea", recourseAttributea
     if (res_attributes != None):
         res_attributes.append(ResourceAttr(counter.id, name, _type))
         recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
@@ -728,7 +685,6 @@ def get_controlcurveinterpolated_attributes(value_, name, counter, attributes_, 
     type = 'array'
     metadata = {}
     metadata['single'] = 'no'
-    print (value_, "=====================>>>>>")
     if "comment" in value_:
         metadata['comment'] = value_['comment']
 
@@ -750,12 +706,30 @@ def get_controlcurveinterpolated_attributes(value_, name, counter, attributes_, 
         recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
 
 def get_new_attributes(attrlist, c_attrlist):
+    vars_attr = ['received_water', 'storage', 'flow']
     new_attr=[]
+    to_be_added = []
+    for var_attr in vars_attr:
+        is_in = False
+        for attr in attrlist:
+            if attr.name.lower() == var_attr:
+                is_in = True
+                break
+        if is_in == False:
+            attr = Attribute(var_attr)
+            to_be_added.append(attr)
+
+    attrlist += to_be_added
+
     for attr in attrlist:
+        is_in=False
         for eattr in c_attrlist:
             if(attr.name.lower() == eattr.name.lower() and attr.dimen.lower() == eattr.dimen.lower):
+                is_in=True
                 break
-        new_attr.append(get_dict(attr))
+        if is_in==False:
+            new_attr.append(get_dict(attr))
+
     return new_attr
 
 def get_dict(obj):
@@ -788,26 +762,16 @@ def check_in_a_list(json_list):
             check_in_a_list(item)
         elif (type(item) is dict):
             for kk in item.keys():
-                print kk
                 if (type(item[kk]) is list):
                     check_in_a_list(item[kk])
-                else:
-                    print kk, item[kk]
-        else:
-            print ((item))
 
 
 def test_for_invalid_keys_names(json_string):
     main_json = json.loads(json_string)
     for key in main_json.keys():
-        print "key is: ", key
         if (type(main_json[key]) is list):
             for item in main_json[key]:
                 check_in_a_list(item)
-        elif (type(main_json[key]) is dict):
-            print main_json[key]
-
-
 
 def import_net (filename, connector):
         has_tablerecorder = False
@@ -819,6 +783,7 @@ def import_net (filename, connector):
         project_attributes = {}
         nodes_types={}
         links_types={}
+        nodes_vars_types = {'output': 'received_water', 'storage': 'storage', 'link': 'flow', 'reservoir': 'storage'}
         pp= dict(
         name="CSV import at %s" ,
         description= \
@@ -882,11 +847,7 @@ def import_net (filename, connector):
         Proj = connector.call('add_project', {'project': project.__dict__})
         if ("recorders" in main_json):
             rcds=get_dict(main_json['recorders'])
-            print "SOSOSOSOS"
-            print rcds.keys()
             for kk in rcds.keys():
-                print type(rcds[kk])
-                print rcds[kk]
                 recorders.append(Recorder(kk, rcds[kk]))
 
         if ( "domains" in main_json):
@@ -919,36 +880,22 @@ def import_net (filename, connector):
         nodes_ids={}
         i = 0
         for json_ in json_list:
-            print "Parameters section is found...."
-            #print json_['parameters'].keys()
+            #print "Parameters section is found...."
             if ("parameters" in json_):
                 for i in range(0, len(json_['parameters'].keys())):
                     k = json_['parameters'].keys()[i]
-                    print k
-                    print "1",  json_['parameters'].values()[i]
-                    print "2", json_['parameters'][k]
-
                     counter.id = counter.id - 1
-                    print "1", len(ref_parameters)
                     get_attribute_type_and_value(json_['parameters'].values()[i], k, counter, ref_parameters, 'default')
-                    print "2", len(ref_parameters)
 
         for node_ in main_json['nodes']:
 
             node_records=[]
-            print "recorders", (get_dict(recorders))
             for rec in recorders:
-                 print "REC: ", get_dict(rec)
                  if hasattr (rec, "node"):
-                 #if ("node" in rec):
                     if rec.node==node_['name']:
                          node_records.append(rec)
-
-
-            node = Node(node_, counter, nodes_attributes, node_records)
-            print ("Name: ", node.name, node.type, nodes_types)
+            node = Node(node_, counter, nodes_attributes, node_records, nodes_vars_types)
             if node.type in nodes_types.keys():
-                print ">>>======>>>>", nodes_types
                 nodes_types[node.type].append(node.name)
             else:
                 nodes_types[node.type] = [node.name]
@@ -987,7 +934,7 @@ def import_net (filename, connector):
             try:
                 rs.attr_id=attrs_names_ids[rs.attr_id]
             except:
-                print "Error-------------->", rs.attr_id
+                print "Not found-------------->", rs.attr_id
         network.scenarios[0].resourcescenarios=recourseAttributea
 
         for rs in network.attributes:
@@ -998,9 +945,6 @@ def import_net (filename, connector):
         for link in network.links:
             for rs in link.attributes:
                 rs.attr_id = attrs_names_ids[rs.attr_id]
-        print "ref: ", ref_parameters.keys()
-
-        print "project: ", project_attributes.keys()
 
         NetworkSummary = connector.call('add_network', {'net': get_dict(network)})
         set_resource_types(nodes_types, links_types, network.type, NetworkSummary, connector)

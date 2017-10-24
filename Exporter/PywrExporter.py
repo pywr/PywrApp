@@ -60,14 +60,14 @@ def check_args(args):
     except (TypeError, ValueError):
         raise HydraPluginError('No senario is specified')
 
-    output = os.path.dirname(args.output)
-    if output == '':
-        output = '.'
-
-    if  os.path.exists(output)==False:
-        raise HydraPluginError('Output file directory '+
+    output = args.output
+    if output!=None:
+        if  os.path.exists(args.output)==False:
+            raise HydraPluginError('Output file directory '+
                                os.path.dirname(args.output)+
                                'does not exist')
+    else:
+        args.output = "network_" + args.network_id + ".json"
 
 class PywrExporter(JSONPlugin):
     def __init__(self, args):
