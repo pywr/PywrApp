@@ -42,13 +42,7 @@
 								<description>reservoir node</description>
 								<displayname>reservoir node</displayname>
 								<image>images\reservoir.png</image>
-							</group>
-                            <group>
-								<name>link</name>
-								<description>link node</description>
-								<displayname>link node</displayname>
-								<image>images\link.png</image>
-							</group>                            							
+							</group>                                                        							
                         </groups>
                     </category>
                     <category>
@@ -61,7 +55,19 @@
 								<description>edge</description>
 								<displayname>edge</displayname>		
 								<image>images\edges.png</image>
-                            </group>
+                            </group>							
+							<group>
+								<name>river</name>
+								<description>river node</description>
+								<displayname>river node</displayname>
+								<image>images\river.png</image>
+							</group>
+							<group>
+								<name>link</name>
+								<description>link node</description>
+								<displayname>link node</displayname>
+								<image>images\link.png</image>
+							</group>
 						</groups>
 				    </category>	
 				</categories>
@@ -238,7 +244,7 @@
     </resource>
 
 	<resource>
-        <type>NODE</type>
+        <type>LINK</type>
         <name>link</name>
         <layout>
             <item>
@@ -268,7 +274,39 @@
             <is_var>Y</is_var>
             <data_type>timeseries</data_type>
         </attribute>      
-    </resource>      
+    </resource> 
+     <resource>
+        <type>LINK</type>
+        <name>river</name>
+        <layout>
+            <item>
+                <name>image</name>
+                <value>images\river.png</value>
+            </item>
+            <item>
+                <name>group</name>
+                <value>river</value>
+            </item>
+        </layout>		
+		<attribute>
+            <name>max_flow</name>
+			<dimension>Dimensionless</dimension>
+             <is_var>N</is_var>
+            <data_type>timeseries</data_type>
+       </attribute>
+        <attribute>
+            <name>min_flow</name>
+			<dimension>Dimensionless</dimension>
+            <is_var>N</is_var>
+            <data_type>timeseries</data_type>			
+        </attribute>
+        <attribute>
+            <name>flow</name>
+			<dimension>Dimensionless</dimension>
+            <is_var>Y</is_var>
+            <data_type>timeseries</data_type>
+        </attribute>      
+    </resource>  	
     <resource>
         <type>LINK</type>
         <name>edge</name>

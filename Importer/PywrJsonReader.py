@@ -114,22 +114,13 @@ class Node(object):
                     is_flow=False
 
                 get_attribute_type_and_value(val, k, counter, attributes_, 'input', self.attributes)
-        #if self.type in nodes_vars_types:
-        #    get_variable_attribute_type_and_value('NULL', nodes_vars_types[self.type], counter, attributes_, 'output', {},
-        #                                          self.attributes)
-
-        #if is_flow == True and has_tablerecorder==True:
-        #    get_variable_attribute_type_and_value('NULL', 'mean_flow', counter, attributes_, 'output', {}, self.attributes)
-
-
-
 
         get_attribute_type_and_value(node_['type'], 'node_type', counter, attributes_, 'input', self.attributes)
         nodes_attributes [self.name]= attributes_
 
-
 class Link(object):
     def __init__(self, edge_, nodes_ids, counter, links_attributes):
+        print "Toz:===>>>",edge_[0], edge_[1]
         self.node_1_id = nodes_ids[edge_[0]]
         self.node_2_id = nodes_ids[edge_[1]]
         self.name = edge_[0] + '_' + edge_[1]
@@ -223,12 +214,9 @@ class Network (object):
 
             self.scenarios[0].add_times(str(timestepper['start']),str(timestepper['end']), str(timestepper['timestep'] ))
 
-
-
         domain_list=[]
         for domain in domains:
             domain_list.append([domain.name, domain.color])
-
 
         counter.id = counter.id - 1
         attributes_['domains'] = AttributeData('array', json.dumps(domain_list), '-', 'Dimensionless')
@@ -239,7 +227,6 @@ class Network (object):
         recorders_list=[]
         metadata_={}
         for recorder in recorders:
-            print "Rec ====>", get_dict(recorder)
             if (recorder.name.lower().strip()=="database" or recorder.type=='CSVRecorder') and not hasattr(recorder, "node"):
                 dic=get_dict(recorder)
                 print "2. Rec ====>", get_dict(recorder)
@@ -248,7 +235,6 @@ class Network (object):
                 for key in dic:
                     if key!="name":
                         metadata[key]=dic[key]
-
                 counter.id = counter.id - 1
                 attributes_['recorder'] = AttributeData("descriptor", "database", '-', 'Dimensionless', metadata)
                 self.attributes.append(ResourceAttr(counter.id, "recorder", 'Input'))
@@ -258,7 +244,6 @@ class Network (object):
 
 class Scenario(object):
     def __init__(self):
-
         self.description="Created by PywrApp"
         self.name="scenarion_" + str(datetime.datetime.now())
         self.resourcescenarios=[]
@@ -325,6 +310,7 @@ class Recorder(object):
         if hasattr(record_, "comment"):
             self.comment = record_.comment
 '''
+
 class Domain (object):
     def __init__(self, domain_):
         self.name=domain_.name
@@ -381,7 +367,6 @@ def read_timeseries(url, name,  sheetname, column=None):
     for date_ in values_:
         date__ = get_datetime(date_)# datetime.datetime.strptime(date_, date_format)
         values[str(date__)] = str(values_[date_])
-
 
     content, date_index, value_index=read_data_file(url, column)
     for i in range (1, len(content)):
@@ -773,6 +758,19 @@ def test_for_invalid_keys_names(json_string):
             for item in main_json[key]:
                 check_in_a_list(item)
 
+'''
+Add from and to nodes to hydra links 
+which is orginally pywr links nodes
+'''
+
+def adjust_links_nodes(nodes_to_links, not_added_links, nodes_ids):
+    for node_name in nodes_to_links.keys():
+        for edge_ in not_added_links:
+            if edge_[0]==node_name:
+                nodes_to_links[node_name].node_2_id=nodes_ids[edge_[1]]
+            elif edge_[1]==node_name:
+                nodes_to_links[node_name].node_1_id= nodes_ids[edge_[0]]
+
 def import_net (filename, connector):
         has_tablerecorder = False
         json_list=[]
@@ -784,19 +782,11 @@ def import_net (filename, connector):
         nodes_types={}
         links_types={}
         nodes_vars_types = {'output': 'received_water', 'storage': 'storage', 'link': 'flow', 'reservoir': 'storage'}
-        pp= dict(
-        name="CSV import at %s" ,
-        description= \
-            "Project created by the %s plug-in, %s." ,
-        status='A',
-        )
+
         c_attrlist = connector.call('get_all_attributes', {})
         nodes_attributes={}
         links_attributes = {}
         network_attributes={}
-        #with open(filename) as f:
-        #    json_string = f.read().splitlines()
-        #'''
         f = open(filename,'r')
         json_string = ""
         while 1:
@@ -804,10 +794,8 @@ def import_net (filename, connector):
             if not line:break
             json_string += line
         f.close()
-        #'''
         test_for_invalid_keys_names(json_string)
         main_json = json.loads(json_string)#, object_hook=lambda d: namedtuple('X', d.keys(), rename=False, verbose=False)(*d.values()))
-        #xx=main_json
         json_list.append(main_json)
         if "includes" in main_json:
                 for included_file in main_json['ncludes']:
@@ -824,7 +812,6 @@ def import_net (filename, connector):
 
                     included_x = json.loads(included_json_string , object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
                     json_list.append(included_x)
-
 
 
                     if ("nodes" in included_x):
@@ -887,30 +874,48 @@ def import_net (filename, connector):
                     counter.id = counter.id - 1
                     get_attribute_type_and_value(json_['parameters'].values()[i], k, counter, ref_parameters, 'default')
 
+        #dict to saves pywr links which will be saved as Hydra nodes,
+        # It will be used later to check the edges section
+        nodes_to_links={}
+        #list used to store the edges which is not used and used
+        #add from and to nodes for links nodes
+        not_added_links=[]
         for node_ in main_json['nodes']:
-
             node_records=[]
             for rec in recorders:
                  if hasattr (rec, "node"):
                     if rec.node==node_['name']:
                          node_records.append(rec)
             node = Node(node_, counter, nodes_attributes, node_records, nodes_vars_types)
-            if node.type in nodes_types.keys():
-                nodes_types[node.type].append(node.name)
+            #check for node type and if it is a link or river it will be added to the links instaed of nodes list
+            if node.type=='link' or node.type=='river':
+                print "Link is dected within nodes ....", node.name
+                if node.type not in links_types:
+                    links_types[node.type] = [node.name]
+                else:
+                    links_types[node.type].append(node.name)
+                network.links.append(node)
+                nodes_to_links[node.name]=node
             else:
-                nodes_types[node.type] = [node.name]
+                print "It is not link", node.name
+                nodes_ids[node_['name']] = node.id
+                if node.type in nodes_types.keys():
+                    nodes_types[node.type].append(node.name)
+                else:
+                    nodes_types[node.type] = [node.name]
+                network.nodes.append(node)
 
-            nodes_ids[node_['name']] = node.id
             counter.id = counter.id - 1
-            network.nodes.append(node)
             for attr_name in nodes_attributes[node.name].keys():
                 if( attr_name in project_attributes):
                     pass
                 else:
                     attr=Attribute(attr_name)
                     project_attributes[attr_name]=attr
-
         for edge_ in main_json['edges']:
+           if edge_[0] in nodes_to_links or edge_[1] in nodes_to_links:
+               not_added_links.append(edge_)
+               continue
            link=Link(edge_, nodes_ids, counter, links_attributes)
            if link.type not in links_types:
                links_types[link.type]=[link.name]
@@ -919,13 +924,11 @@ def import_net (filename, connector):
            counter.id = counter.id - 1
            network.links.append(link)
            for attr_name in links_attributes[link.name].keys():
-               if (attr_name in project_attributes):
-                   pass
-               else:
+               if (attr_name not in project_attributes):
                    attr = Attribute(attr_name)
                    project_attributes[attr_name] = attr
-
         new_attr = get_new_attributes(project_attributes.values(), c_attrlist)
+        adjust_links_nodes(nodes_to_links, not_added_links, nodes_ids)
         attributes = connector.call('add_attributes', {'attrs': new_attr})
         attrs_names_ids={}
         for tt in attributes:
@@ -952,16 +955,16 @@ def import_net (filename, connector):
 
 
 '''
-This function has be token from ImportCSV.py and has been modified to work with the app
+    This function has be token from ImportCSV.py and has been modified to work with the app
+    It is used to upload the template to the server and set types to nodes and links
 '''
+
 def set_resource_types(nodes_types, links_types, networktype, NetworkSummary, connection):
     template_file='..\PywrNetwork.xml'
     print("Setting resource types based on %s." % template_file)
     with open(template_file) as f:
         xml_template = f.read()
-
     template = connection.call('upload_template_xml', {'template_xml':xml_template})
-
     type_ids = {}
     warnings = []
 
@@ -976,7 +979,6 @@ def set_resource_types(nodes_types, links_types, networktype, NetworkSummary, co
             if tmpltype['name'] == type_name:
                 type_ids.update({tmpltype['name']: tmpltype['id']})
                 break
-
 
     for tmpltype in template.get('types', []):
         if tmpltype['name'] == networktype:

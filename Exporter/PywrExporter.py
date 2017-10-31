@@ -80,6 +80,11 @@ class PywrExporter(JSONPlugin):
                                                    'template_id': self.template_id,
                                                    'scenario_ids': [self.scenario_id]})
         self.attrlist = self.connection.call('get_all_attributes', {})
+        self.template = self.connection.call('get_template',
+                      {'template_id': self.net.types[0].template_id})
+
+
+
 if __name__ == '__main__':
     errors  = []
     steps=7

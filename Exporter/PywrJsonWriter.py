@@ -252,27 +252,23 @@ class Node(dict):
             elif (metadata['type'] == 'recorderthreshold'):
                 complex_attributes[attr.name] = Recorderthreshold(attr, res, metadata, single_parameters)
 
-
         adjuest_parameters(complex_attributes)
 
         for item in complex_attributes.keys():
             self.__dict__[attr.name] =complex_attributes[item]
             attributes[attr.name] = self.__dict__[attr.name]
 
-
         for item in single_parameters.keys():
             self.__dict__[item] = single_parameters[item]
             attributes[item] = self.__dict__[item]
-
-        self.position = {}
-
-        self.position['schematic'] = [node_.x, node_.y]
-        if(geographic==None):
-            self.position['geographic'] = []
-        else:
-            self.position['geographic'] = geographic
+        if hasattr(node_, "x") and hasattr(node_, "y"):
+            self.position = {}
+            self.position['schematic'] = [node_.x, node_.y]
+            if(geographic==None):
+                self.position['geographic'] = []
+            else:
+                self.position['geographic'] = geographic
         nodes_parameters[self.name]=attributes
-
 
 def get_tablesarray_values(value, metadata):
     values={}
@@ -283,13 +279,11 @@ def get_tablesarray_values(value, metadata):
     values['url'] = value
     return values
 
-
 def get_timesreies_values(value, column, metadata):
     if('type' in metadata.keys()):
         type_ = metadata['type']
     else:
         type_ = 'default'
-
     values={}
     vv = json.loads(value)
     contents=[]
@@ -354,8 +348,12 @@ def get_resourcescenarios_ids(resourcescenarios):
     return resourcescenarios_ids
 
 class Edge(object):
-    def __init__(self, link_, attributes_ids, resourcescenarios_ids, nodes_id_name):
-        self.attrs=[nodes_id_name[link_.node_1_id], nodes_id_name[link_.node_2_id]]
+    def __init__(self,from_node,to_node):
+        self.attrs = [from_node,to_node]
+
+    @classmethod
+    def from_link(cls, link_, attributes_ids, resourcescenarios_ids, nodes_id_name):
+        ss=cls(nodes_id_name[link_.node_1_id], nodes_id_name[link_.node_2_id])
         for attr_ in link_.attributes:
             attr = attributes_ids[attr_.attr_id]
             res = resourcescenarios_ids[attr_.id]
@@ -372,8 +370,10 @@ class Edge(object):
                 else:
                     slot_to = res.value.value
         if(slot_to !=None or slot_from !=None):
-            self.attrs.append(slot_from)
-            self.attrs.append(slot_to)
+            ss.attrs.append(slot_from)
+            ss.attrs.append(slot_to)
+        return ss
+
 
 class Parameter(object):
     def __init__(self):
@@ -507,7 +507,6 @@ class PywrNetwork (object):
 
         return  json_string
 
-
 def get_parameters_refs(nodes):
     for i in range(0, len(nodes)):
         node = nodes[i]
@@ -542,13 +541,12 @@ def get_parameters_refs(nodes):
                 if attr.lower() == (key+'_ref').lower():
                     if parameters[attr]== node.__dict__[key]:
                         node.__dict__[key]=attr
-
     return  parameters
 
-def pywrwriter (network, attrlist, output_file, steps):
+
+def pywrwriter(network, attrlist, output_file, steps):
     json_file__folder=os.path.dirname(output_file)
     write_progress(4, steps)
-
     nodes=[]
     edges=[]
     domains=[]
@@ -578,16 +576,28 @@ def pywrwriter (network, attrlist, output_file, steps):
         nodes.append(node)
     #need to be done check parameters refs for the new pywr format
     parameters=get_parameters_refs(nodes)
+    to_be_added_to_nodes=[]
 
     for link_ in network.links:
-        edge=Edge(link_, attributes_ids, resourcescenarios_ids, nodes_id_name)
-        edges.append(edge.attrs)
+        #test if the link type is link or river, if so add it to the pywr nodes
+        if link_.types[0].name =='link' or link_.types[0].name=='river':
+            node = Node(link_, attributes_ids, resourcescenarios_ids)
+            nodes_id_name[node_.id] = node_.name
+            nodes.append(node)
+            to_be_added_to_nodes.append(link_)
+        else:
+            edge=Edge.from_link(link_, attributes_ids, resourcescenarios_ids, nodes_id_name)
+            edges.append(edge.attrs)
+    #add eges for links nodes
+    for link_ in to_be_added_to_nodes:
+        edges.append(Edge(nodes_id_name[link_.node_1_id],link_.name).attrs)
+        edges.append(Edge(link_.name,nodes_id_name[link_.node_2_id]).attrs)
+
     for node in nodes:
         for i in range(0, len(node.__dict__.keys())):
             k = node.__dict__.keys()[i]
             if (k.lower() != 'name' and k.lower() != 'type' and k.lower() != 'position'):
                 value=node.__dict__.values()[i]
-
                 if type(value) is dict:
                     if value['type'] == 'arrayindexed' or value['type'] == 'dailyprofile' or value['type'] == 'dataframe':
                         file_name=node.name+"_"+k+'.csv'

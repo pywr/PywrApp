@@ -28,9 +28,6 @@ def get_dict(obj):
 
 def load_model(file_name):
     model = Model.load(file_name)
-    #start= pandas.to_datetime(model.timestepper.start)
-    #end= pandas.to_datetime(model.timestepper.end)
-    #timeStep= ((model.timestepper.delta))
     # check the model is OK
     model.check()
     model.run()
@@ -61,8 +58,6 @@ def load_model(file_name):
                         else:
                             file.write("," + str(items))
                 file.write('\n')
-                #scenario = 0
-                #timestep = 0
     file.close()
 
 
