@@ -20,6 +20,12 @@
 								<image>images\output.png</image>
 							</group>
 							<group>
+								<name>Input</name>
+								<description>Input node</description>
+								<displayname>Input node</displayname>
+								<image>images\input.png</image>
+							</group>
+							<group>
 								<name>AggregatedNode</name>
 								<description>AggregatedNode node</description>
 								<displayname>AggregatedNode node</displayname>
@@ -145,6 +151,39 @@
             <data_type>timeseries</data_type>
         </attribute> 		
     </resource>
+	 <resource>
+        <type>NODE</type>
+        <name>Input</name>
+        <layout>
+            <item>
+                <name>image</name>
+                <value>images\input.png</value>
+            </item>
+            <item>
+                <name>group</name>
+                <value>input</value>
+            </item>
+        </layout>
+        <attribute>
+            <name>max_flow</name>
+			<dimension>Dimensionless</dimension>
+            <is_var>N</is_var>
+            <data_type>timeseries</data_type>
+        </attribute>    
+		<attribute>
+            <name>min_flow</name>
+			<dimension>Dimensionless</dimension>
+            <is_var>N</is_var>
+            <data_type>timeseries</data_type>
+        </attribute> 
+		<attribute>
+            <name>mean_flow</name>
+			<dimension>Dimensionless</dimension>
+            <is_var>Y</is_var>
+            <data_type>timeseries</data_type>
+        </attribute>    		
+    </resource>
+	
     <resource>
         <type>NODE</type>
         <name>catchment</name>
@@ -241,8 +280,13 @@
             <is_var>N</is_var>
 			<data_type>scalar</data_type>		
         </attribute>
+		 <attribute>
+            <name>reservoir_area</name>     
+            <dimension>Dimensionless</dimension>   			
+            <is_var>N</is_var>
+            <data_type>array</data_type>
+        </attribute>
     </resource>
-
 	<resource>
         <type>LINK</type>
         <name>link</name>

@@ -1,13 +1,8 @@
-import pywr
 import sys
 from pywr.core import Model, Input, Output, Link
 
-import numpy as np
 import pandas
-from IPython.core.display import display
-import time
 pandas.set_option("precision", 3)
-
 
 def get_dict(obj):
     if not  hasattr(obj,"__dict__"):
@@ -28,7 +23,7 @@ def get_dict(obj):
 
 def load_model(file_name):
     model = Model.load(file_name)
-    # check the model is OK
+    # check if the model is OK
     model.check()
     model.run()
     start_date= pandas.to_datetime(model.timestepper.start)
@@ -62,7 +57,6 @@ def load_model(file_name):
 
 
 if __name__ == '__main__':
-    #filename = "mean_flow_recorder.json"
     args=sys.argv
     if len(args)>1:
         filename=str(args[1])

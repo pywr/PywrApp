@@ -1,14 +1,60 @@
-import sys
+# (c) Copyright 2017 University of Manchester\
+
+"""A Hydra plug-in to export a network and a scenario to a set of files, which
+can be imported into a JSON Pywr model.
+
+It creates the Pywr JSON file from Hydra network
+More information about pywr Json format can be found in this link:
+https://pywr.github.io/pywr-docs/json.html
+
+The Pywr Emporter plug-in provides an easy to use tool for exporting data from
+HydraPlatform to JSON model format. The basic idea is that this plug-in
+exports a network and associated data from HydraPlatform to a text file which
+can be loaded into Pywr model using model=Model.load(json_file_name)
+
+Using the commandline tool
+--------------------------
+
+**arguments:**
+
+====================== ======= ========== ======================================
+Option                 Short   Parameter  Description
+====================== ======= ========== ======================================
+--network              -t      NETWORK    ID of the network that will be
+                                          exported.
+--scenario             -s      SCENARIO   ID of the scenario that will be
+                                          exported.
+--template-id          -tp     TEMPLATE   ID of the template used for exporting
+                                          resources. Attributes that don't
+                                          belong to this template are ignored.
+--output               -o      OUTPUT     Filename of the output file. if is not provided
+                                          a "network_network_id.json" will be used as a default output file name
+====================== ======= ========== ======================================
+
+**Server-based arguments**
+====================== ====== ========== =========================================
+Option                 Short  Parameter  Description
+====================== ====== ========== =========================================
+--server_url           -u     SERVER_URL Url of the server the plugin will
+                                         connect to.
+                                         Defaults to localhost.
+--session_id           -c     SESSION_ID Session ID used by the calling software
+                                         If left empty, the plugin will attempt
+
+
+The main goal of this plug-in is to provide a tool for exporting
+network topologies and data to a file readable by Pywr.
+
+Examples:
+=========
+Exporting use time axis:
+ python GAMSExport.py -t 16 -s 16  -o "c:\temp\example_2.json"
+
+"""
+
 import os
-import time
-import json
-from datetime import datetime
-
-from string import ascii_lowercase
-
 from HydraLib.PluginLib import JSONPlugin
 from HydraLib.HydraException import HydraPluginError
-from HydraLib.hydra_dateutil import reindex_timeseries
 from HydraLib import PluginLib
 
 from HydraLib.PluginLib import write_progress, write_output
@@ -17,7 +63,7 @@ from PywrJsonWriter import pywrwriter
 def commandline_parser():
     parser = ap.ArgumentParser(
         description="""Export a network from Hydra to a Pywr Json text file.
-                    (c) Copyright 2016, Univeristy of Manchester.
+                    (c) Copyright 2017, Univeristy of Manchester.
         """, epilog="For more information, web site will available soon",
         formatter_class=ap.RawDescriptionHelpFormatter)
 
@@ -40,10 +86,6 @@ def commandline_parser():
                         help='''Session ID. If this does not exist, a login will be
                         attempted based on details in config.''')
     return parser
-
-from decimal import Decimal
-
-import json
 
 import logging
 import argparse as ap
@@ -82,7 +124,6 @@ class PywrExporter(JSONPlugin):
         self.attrlist = self.connection.call('get_all_attributes', {})
         self.template = self.connection.call('get_template',
                       {'template_id': self.net.types[0].template_id})
-
 
 
 if __name__ == '__main__':

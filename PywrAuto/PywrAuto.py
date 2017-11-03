@@ -1,38 +1,57 @@
-import sys
+'''
+(c) 2017 University of Manchester\
+
+plugin_name: PywrAuto
+
+This app export the Hydranetwork into Pywr json file, runs he Pywr model and extract the model output and pushed them to the Hydra
+
+**Args:**
+====================== ======= ========== =========================================
+Option                 Short   Parameter  Description
+====================== ======= ========== =========================================
+--network              -t      NETWORK    ID of the network where results will
+                                          be imported to.
+--scenario             -s      SCENARIO   ID of the underlying scenario used for
+--template-id          -tp     TEMPLATE   ID of the template used for exporting
+                                          resources. Attributes that don't
+                                          belong to this template are ignored.
+--output               -o      OUTPUT     Filename of the output file.
+                                          if is not provided
+                                          a "network_network_id.json" will be used as a default output file name
+--python3-path         -p     path to     python 3 is required to run pywr
+                              python 3
+**Server-based arguments**
+====================== ====== ========== =========================================
+Option                 Short  Parameter  Description
+====================== ====== ========== =========================================
+--server_url           -u     SERVER_URL Url of the server the plugin will
+                                         connect to.
+                                         Defaults to localhost.
+--session_id           -c     SESSION_ID Session ID used by the calling software
+                                         If left empty, the plugin will attempt
+
+Example:
+=========
+        -t 16 -s 16 -p "C:\ProgramData\Anaconda3\envs\pywr"
+'''
+
 import os
 import time
-import json
 from datetime import datetime
 from dateutil import parser as prs
 from dateutil.relativedelta import relativedelta
-
 import subprocess
-from string import ascii_lowercase
-
 from HydraLib.PluginLib import JSONPlugin
 from HydraLib.HydraException import HydraPluginError
-from HydraLib.hydra_dateutil import reindex_timeseries
 from HydraLib import PluginLib
-
 from HydraLib.PluginLib import write_progress, write_output
-
-pythondir = os.path.dirname(os.path.realpath(__file__))
-exportpath=os.path.join(pythondir, '..', 'Exporter')
-api_path = os.path.realpath(exportpath)
-if api_path not in sys.path:
-    sys.path.insert(0, api_path)
-
-importpath=os.path.join(pythondir, '..', 'Importer')
-api_path = os.path.realpath(importpath)
-if api_path not in sys.path:
-    sys.path.insert(0, api_path)
-
-
-from PywrJsonWriter import pywrwriter, get_dict
-
-from PywrJsonWriter import get_resourcescenarios_ids
-
-from data_files_reader import get_h5DF_store, read_tables_recoder, get_node_attr_values
+from Lib.data_files_reader import get_h5DF_store, get_node_attr_values
+from Exporter.PywrJsonWriter import pywrwriter
+from Exporter.PywrJsonWriter import get_resourcescenarios_ids
+import json
+import logging
+import argparse as ap
+log = logging.getLogger(__name__)
 
 def commandline_parser():
     parser = ap.ArgumentParser(
@@ -59,18 +78,15 @@ def commandline_parser():
     parser.add_argument('-c', '--session_id',
                         help='''Session ID. If this does not exist, a login will be
                         attempted based on details in config.''')
+
+    parser.add_argument('-p', '--python3-path',
+                        help='''path to python 3''')
     return parser
 
-from decimal import Decimal
-
-import json
-
-import logging
-import argparse as ap
-
-log = logging.getLogger(__name__)
-
 def check_args(args):
+    if args.python3_path==None:
+        raise HydraPluginError('No path to python3 is specified, it is required to run pywr')
+
     try:
         int(args.network_id)
     except (TypeError, ValueError):
@@ -88,11 +104,10 @@ def check_args(args):
                                'does not exist')
     else:
         output = "network_" + args.network_id + ".json"
-
     return output
 
 
-class varaiable_record(object):
+class resource_varaiable(object):
     def __init__(self, rec_name, res, value, start_date, end_date, time_step):
         self.values = {}
         start_date=prs.parse(start_date)
@@ -131,8 +146,6 @@ class varaiable_record(object):
                 self.values[(time_axis[i])]=float(value[i])
 
 
-
-
 class PywrExporter(JSONPlugin):
     def __init__(self, args):
         self.connect(args)
@@ -156,11 +169,10 @@ def check_output_file(results_file, start_time):
     else:
         raise HydraPluginError('No updated Output file is found')
 
-def run_pywr_model(file_name):
-    cmd = "PywrRunner.bat " + file_name
-    proc = subprocess.Popen(cmd)
+def run_pywr_model(file_name, python3_path):
+    cmd=os.path.join(python3_path, "python")
+    proc = subprocess.Popen([cmd, 'PywrRunner.py', file_name])
     proc.wait()
-
 
 def import_results(results_file, network, nodes_vars):
     csvfile=None
@@ -199,7 +211,8 @@ def import_results(results_file, network, nodes_vars):
                 h5file = res
                 get_tablesrecorder_varaiables(h5file, varaiables_records, network,  start_date, end_date, timeStep, nodes_vars)
                 continue
-            var = varaiable_record(nodes_vars[rec_name], res, value, start_date, end_date, timeStep)
+            print "=====>>>", rec_name
+            var = resource_varaiable(nodes_vars[rec_name], res, value, start_date, end_date, timeStep)
 
             varaiables_records.append(var)
 
@@ -218,7 +231,7 @@ def get_csvrecorder_varaiables(csvfile, varaiables_records, start_date, end_date
             line=contents[j].split(',')
             values.append(line[i])
         if res_name in nodes_vars:
-            var = varaiable_record(nodes_vars[res_name], res_name, values, start_date, end_date, timeStep)
+            var = resource_varaiable(nodes_vars[res_name], res_name, values, start_date, end_date, timeStep)
             varaiables_records.append(var)
 
 def get_tablesrecorder_varaiables(h5file, varaiables_records, network, start_date, end_date, timeStep,nodes_vars):
@@ -226,14 +239,13 @@ def get_tablesrecorder_varaiables(h5file, varaiables_records, network, start_dat
     for node in network.nodes:
         values=get_node_attr_values(store, node.name)
         if values !=None:
-            var = varaiable_record(nodes_vars[node.name], node.name, values, start_date, end_date, timeStep)
+            var = resource_varaiable(nodes_vars[node.name], node.name, values, start_date, end_date, timeStep)
             varaiables_records.append(var)
         else:
             continue
 
 def import_vars(network, varaiables_records, attrlist):
     attrs = dict()
-    nodes_recodres={}
     resourcescenarios_ids=get_resourcescenarios_ids(network.scenarios[0].resourcescenarios)
     for attr in attrlist:
         attrs.update({attr.id: attr.name})
@@ -241,13 +253,9 @@ def import_vars(network, varaiables_records, attrlist):
     for attr in attrlist:
         attributes_ids[attr.id] = attr
     res_scenario = network.scenarios[0].resourcescenarios
-    nodes = dict()
-    metadata = {}
-    print "LENGTH:", len(varaiables_records)
     for varaiable_record in varaiables_records:
         for node in network.nodes:
             if node.name.lower().strip() == varaiable_record.res.lower().strip():
-            #nodes.update({node.id: node.name})
                 for attr_ in node.attributes:
                     if attr_.attr_is_var == 'Y':
                         attr = attrs[attr_.attr_id]
@@ -275,11 +283,12 @@ def import_vars(network, varaiables_records, attrlist):
 def save(network, connection):
     connection.call('update_scenario', {'scen': network.scenarios[0]})
 
-
-def get_nodes_vars(network):
-    nodes_vars_types = {'output': 'received_water', 'storage': 'storage', 'link': 'flow','reservoir':'storage'}
+def get_nodes_variables(network):
+    nodes_vars_types = {'output': 'received_water', 'storage': 'storage', 'link': 'flow', 'river': 'flow','reservoir':'storage', 'Input': 'mean_flow'}
     nodes_vars={}
     for node in network.nodes:
+        if node.types==None or len(node.types)==0:
+            continue
         type_=node.types[0]['name']
         if type_=='catchment' or type_=='AggregatedNode':
             continue
@@ -295,17 +304,16 @@ if __name__ == '__main__':
         parser = commandline_parser()
         args = parser.parse_args()
         write_progress(2, steps)
-
         outputfile=check_args(args)
         pywrexporter = PywrExporter(args)
         write_progress(3, steps)
         pywrwriter(pywrexporter.net, pywrexporter.attrlist, outputfile, steps)
         write_progress(7, steps)
-        nodes_vars=get_nodes_vars(pywrexporter.net)
+        nodes_vars=get_nodes_variables(pywrexporter.net)
         start_time = datetime.now().replace(microsecond=0)
         write_progress(8, steps)
 
-        run_pywr_model(outputfile)
+        run_pywr_model(outputfile, args.python3_path)
         write_progress(9, steps)
 
         results_file = outputfile + ".csv"

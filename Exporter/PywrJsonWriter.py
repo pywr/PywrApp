@@ -1,21 +1,20 @@
 import json
-import jsonpickle
-import random
-from collections import namedtuple
-from dateutil.parser import parse
-from datetime import datetime
-from datetime import timedelta
-import datetime
-import inspect
 import os
-from HydraLib.PluginLib import write_progress, write_output
+
+from HydraLib.PluginLib import write_progress
+
+from Lib.utilities import get_dict
+
 nodes_parameters = {}
 
 parameters = {}
 recorders={}
-from data_files_writer import write_tablesarray_to_hdf
+
+
+from Lib.data_files_writer import write_tablesarray_to_hdf
 
 has_tablerecorder=False
+
 class Recorderthreshold (object):
     def __init__(self, attr, res, metadata, single_parameters):
         to_be_deleted=[]
@@ -40,7 +39,6 @@ class Aggregated (object):
         for item in to_be_deleted:
             parameters[item]=single_parameters[item]
             del single_parameters[item]
-
 
 class Controlcurveindex(object):
     def __init__(self,attr, res, metadata, single_parameters):
@@ -117,7 +115,6 @@ class ControlCurveInterpolated (object):
             del single_parameters[self.control_curve]
 
 
-
 def adjuest_parameters(complex_attrinbtes):
     to_be_deleted=[]
     for attr_name in complex_attrinbtes.keys():
@@ -161,7 +158,15 @@ def adjuest_parameters(complex_attrinbtes):
 
 
 class Node(dict):
+    '''
+    Pywr node and its attributes
+    '''
     def __init__(self, node_, attributes_ids, resourcescenarios_ids):
+        '''
+        :param node_: Hydra node
+        :param attributes_ids:  dict which its keys are attributes ids and values are the atrributes
+        :param resourcescenarios_ids: dict, its keys are resourcescenarios ids and values are the resourcescenarios
+        '''
         global has_tablerecorder
         self.name=node_.name
         single_parameters={}
@@ -223,13 +228,17 @@ class Node(dict):
 
             elif res.value.type == 'array' and metadata['single'] == 'yes':
                 if 'type' in metadata.keys() and metadata['type']=='tablesarray':
-                    single_parameters[attr.name] = get_tablesarray_values(res.value.value, metadata)
+                    single_parameters[attr.name] = get_tables_array_values(res.value.value, metadata)
 
 
                 elif res.value.type == 'array' and metadata['single'] == 'yes':
                     single_parameters[attr.name] =json.loads (res.value.value)
 
         complex_attributes={}
+        '''
+        get pywr node complex attributes 
+        it checks the metadata which specifies the attribute type, and accordingly construct it 
+        '''
         for attr_ in aggregated_attributes:
             attr = attributes_ids[attr_.attr_id]
             res = resourcescenarios_ids[attr_.id]
@@ -270,7 +279,7 @@ class Node(dict):
                 self.position['geographic'] = geographic
         nodes_parameters[self.name]=attributes
 
-def get_tablesarray_values(value, metadata):
+def get_tables_array_values(value, metadata):
     values={}
     for key in metadata.keys():
         if key =='user_id' or key =='single':
@@ -280,6 +289,12 @@ def get_tablesarray_values(value, metadata):
     return values
 
 def get_timesreies_values(value, column, metadata):
+    '''
+    :param value: Json string which represnt the values
+    :param column: the column name
+    :param metadata: dict contains the attribute metadata which are required to write the values
+    :return: dict which contains
+    '''
     if('type' in metadata.keys()):
         type_ = metadata['type']
     else:
@@ -291,16 +306,27 @@ def get_timesreies_values(value, column, metadata):
         contents.append('Index,' + column + '\n')
     elif (type_ == 'dataframe'):
         contents.append('Timestamp,' + 'Data' + '\n')
-
     else:
         contents.append('Date,'+column+'\n')
     day=1
+    import datetime
+    from dateutil import parser
+    print "LOW: ", vv.keys().sort()
     for key in vv.keys():
-        for date in sorted(vv[key].keys()):
+        dated_dict={}
+        for ts in (vv[key].keys()):
+            dated_dict[parser.parse(ts)]=ts
+
+        ll=dated_dict.keys()
+        ll.sort()
+
+        for date_ in ll:
+            date=dated_dict[date_]
+            print "Date: ", (date_)
             if(date.startswith('9999') ):
                 if(type_ == "monthlyprofile"):
                     values['type'] = type_
-                    values['values'] = ger_arrayvalues(vv[key])
+                    values['values'] = get_array_values(vv[key])
                     return values
                 elif type_ == "dailyprofile":
                     contents.append(str(day) + ',' + str(vv[key][date]) + '\n')
@@ -309,6 +335,7 @@ def get_timesreies_values(value, column, metadata):
                 contents.append(date+','+str(vv[key][date])+'\n')
     # in case of  dailyprofile, hydra save only 365 dats in a year while
     # pywr required values for 356 days, so days 365 is repeated till fix that in hydar
+    # this should be modified shortly and uses the Hydra hashtable attribute type
     if(type_ == "dailyprofile"):
         contents.append(str(day) + ',' + str(vv[key][date]))
     if ('parse_dates' in metadata.keys()):
@@ -318,7 +345,7 @@ def get_timesreies_values(value, column, metadata):
             values['parse_dates']=False
 
     if ('index_col' in metadata.keys()):
-        values['index_col'] = (metadata['index_col'])
+        values['index_col'] = int(metadata['index_col'])
 
     if ('dayfirst' in metadata.keys()):
         values['dayfirst'] = metadata['dayfirst']
@@ -330,12 +357,12 @@ def get_timesreies_values(value, column, metadata):
 
     return values
 
-def write_time_series_tofile(contents, filename):
+def write_time_series_to_file(contents, filename):
     file = open(filename, "w")
     file.write("".join(contents))
     file.close()
 
-def ger_arrayvalues(value_):
+def get_array_values(value_):
     contenets=[]
     for date in sorted(value_.keys()):
         contenets.append(value_[date])
@@ -373,16 +400,6 @@ class Edge(object):
             ss.attrs.append(slot_from)
             ss.attrs.append(slot_to)
         return ss
-
-
-class Parameter(object):
-    def __init__(self):
-        pass
-
-class Value(object):
-    def __init__(self):
-        pass
-
 class Recorder(object):
     def __init__(self, value):
         if(len(value)==2):
@@ -400,6 +417,12 @@ class Recorder(object):
                 self.type = value[0]
 
 def get_recotds(network, attributes_ids, resourcescenarios_ids):
+    '''
+    :param network: Hydra network
+    :param attributes_ids: dict the keys is attributes ids and values are the attributes objects
+    :param resourcescenarios_ids: dict the keys is resourcescenarios ids and values are the resourcescenarios objects
+    it changes global  has_tablerecorder Boolean
+    '''
     global has_tablerecorder
     for attr_ in network.attributes:
         attr = attributes_ids[attr_.attr_id]
@@ -412,9 +435,7 @@ def get_recotds(network, attributes_ids, resourcescenarios_ids):
             for key in metadata.keys():
                 if(key!="user_id"):
                   dic[key]=metadata[key]
-
             has_tablerecorder=True
-    #return recorders
 
 class Domain(object):
     def __init__(self, name, color):
@@ -422,6 +443,9 @@ class Domain(object):
         self.color = color
 
 class Solver(object):
+    '''
+    Solver attribures
+    '''
     def __init__(self, network, attributes_ids, resourcescenarios_ids):
         for attr_ in network.attributes:
             attr = attributes_ids[attr_.attr_id]
@@ -430,6 +454,9 @@ class Solver(object):
                 self.name=res.value.value
 
 class Timestepper(object):
+    '''
+     Class contains the data for the model time axis
+    '''
     def __init__(self, network, attributes_ids, resourcescenarios_ids):
         for attr_ in network.attributes:
             attr = attributes_ids[attr_.attr_id]
@@ -442,6 +469,9 @@ class Timestepper(object):
                 self.timestep = int(res.value.value)
 
 class Metadata (object):
+    '''
+    contains the pywr model metadata
+    '''
     def __init__(self, network, resourcescenarios_ids, attributes_ids):
        self.title=network.name
        for attr_ in network.attributes:
@@ -455,30 +485,13 @@ class Metadata (object):
            self.description=network.description
 
 
-def get_dict(obj):
-    if type(obj) is list:
-        list_results=[]
-        for item in obj:
-            list_results.append(get_dict(item))
-        return list_results
-
-    if not hasattr(obj, "__dict__"):
-        return obj
-
-    result = {}
-    for key, val in obj.__dict__.items():
-        if key.startswith("_"):
-            continue
-        if isinstance(val, list):
-            element = []
-            for item in val:
-                element.append(get_dict(item))
-        else:
-            element = get_dict(obj.__dict__[key])
-        result[key] = element
-    return result
-
 class PywrNetwork (object):
+    '''
+        Class contains all pywr json sections
+        The sections are lists contains objects of different pywr model sections
+        It is objects with their attaributes
+        It will be converted to Json string using json.dumps method latter
+    '''
     def __init__(self, metadata, timestepper, solver, nodes, edges, domains, parameters,  recorders):
         self.metadata=metadata
         self.timestepper=timestepper
@@ -487,10 +500,12 @@ class PywrNetwork (object):
         self.edges=edges
         self.domains=domains
         self.parameters=parameters
-        print "TTTTTTTTTTTT", recorders
         self.recorders=recorders
 
     def get_json(self):
+        '''
+        prepare and return the pywr json string from this class varaibles
+        '''
         json_string='{\n\"metadata\": '+json.dumps(get_dict(self.metadata), indent=4)+',\n'
         if len(get_dict(self.timestepper)) > 0:
             json_string=json_string+'\"timestepper\": '+json.dumps(get_dict(self.timestepper), indent=4)+',\n'
@@ -508,6 +523,11 @@ class PywrNetwork (object):
         return  json_string
 
 def get_parameters_refs(nodes):
+    '''
+    :param nodes: the network nodes
+    It goes throw their attributes and get parameters references list
+    :return: parameters references list
+    '''
     for i in range(0, len(nodes)):
         node = nodes[i]
         for j in range(i+1, len(nodes)):
@@ -545,6 +565,13 @@ def get_parameters_refs(nodes):
 
 
 def pywrwriter(network, attrlist, output_file, steps):
+    '''
+    It reads the Hydra network and convert it to a equivalent pywr model
+    :param network: Hydra network
+    :param attrlist: projects hydra attibutes
+    :param output_file: the json file name
+    :param steps: integer which is used to indicates the script progress
+    '''
     json_file__folder=os.path.dirname(output_file)
     write_progress(4, steps)
     nodes=[]
@@ -557,8 +584,6 @@ def pywrwriter(network, attrlist, output_file, steps):
     timestepper=Timestepper(network, attributes_ids, resourcescenarios_ids)
     metadata = Metadata(network, resourcescenarios_ids, attributes_ids)
     get_recotds(network, attributes_ids, resourcescenarios_ids)
-    #get_recotds(network, attributes_ids, resourcescenarios_ids)
-    domains=[]
     for attr_ in network.attributes:
         attr = attributes_ids[attr_.attr_id]
         res = resourcescenarios_ids[attr_.id]
@@ -579,7 +604,7 @@ def pywrwriter(network, attrlist, output_file, steps):
     to_be_added_to_nodes=[]
 
     for link_ in network.links:
-        #test if the link type is link or river, if so add it to the pywr nodes
+        #test if the link type is link or river, if so it will be added to the pywr nodes
         if link_.types[0].name =='link' or link_.types[0].name=='river':
             node = Node(link_, attributes_ids, resourcescenarios_ids)
             nodes_id_name[node_.id] = node_.name
@@ -588,7 +613,7 @@ def pywrwriter(network, attrlist, output_file, steps):
         else:
             edge=Edge.from_link(link_, attributes_ids, resourcescenarios_ids, nodes_id_name)
             edges.append(edge.attrs)
-    #add eges for links nodes
+    #add edges for links nodes
     for link_ in to_be_added_to_nodes:
         edges.append(Edge(nodes_id_name[link_.node_1_id],link_.name).attrs)
         edges.append(Edge(link_.name,nodes_id_name[link_.node_2_id]).attrs)
@@ -601,24 +626,21 @@ def pywrwriter(network, attrlist, output_file, steps):
                 if type(value) is dict:
                     if value['type'] == 'arrayindexed' or value['type'] == 'dailyprofile' or value['type'] == 'dataframe':
                         file_name=node.name+"_"+k+'.csv'
-                        write_time_series_tofile(value['url'], os.path.join(json_file__folder, file_name))
+                        write_time_series_to_file(value['url'], os.path.join(json_file__folder, file_name))
                         value['url']=file_name
 
     for k in parameters:
         value=parameters[k]
-
         if type(value) is dict and 'type' in value.keys():
-
             if value['type'] == 'arrayindexed' or value['type'] == 'dailyprofile':
                 file_name = node.name + "_" + k + '.csv'
-                write_time_series_tofile(value['url'], os.path.join(json_file__folder, file_name))
+                write_time_series_to_file(value['url'], os.path.join(json_file__folder, file_name))
                 value['url'] = file_name
             else:
                 if value['type'] == 'tablesarray':
                      file_name=node.name+"_"+k+'.h5'
                      write_tablesarray_to_hdf(os.path.join(json_file__folder, file_name), value['where'], value['node'], value['url'])
                      value['url'] = file_name
-
     write_progress(5, steps)
 
     pywrNetwork=PywrNetwork(metadata, timestepper, solver, nodes, edges, domains, parameters,  recorders)

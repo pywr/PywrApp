@@ -1,27 +1,50 @@
-import sys
-import os
-import time
-import json
-from datetime import datetime
+# (c) Copyright 2017 University of Manchester\
+
+'''
+ plugin_name: PywrImporter
+
+Basics
+~~~~~~
+The Pywr import plug-in provides an easy to use tool to import JSON model format
+into HydraPlatform network.
+
+This App reads JSON file model file and create Hydra network and pushed to the server
+
+More information about pywr Json format can be found in this link:
+https://pywr.github.io/pywr-docs/json.html
+
+**Argument:**
 
 
-from string import ascii_lowercase
+====================== ====== ========== ======================================
+Option                 Short  Parameter  Description
+====================== ====== ========== ======================================
+                                         used for the simulation.
+--JSON-model-format-file            -f     Json file containing Pywr model
+
+**Server-based arguments**
+====================== ====== ========== =========================================
+Option                 Short  Parameter  Description
+====================== ====== ========== =========================================
+--server_url           -u     SERVER_URL Url of the server the plugin will
+                                         connect to.
+                                         Defaults to localhost.
+--session_id           -c     SESSION_ID Session ID used by the calling software
+                                         If left empty, the plugin will attempt
+
+Examples:
+=========
+python PywrImporter.py  -m "c:\temp\Example_3.json"
+'''
+
+
 
 from HydraLib.PluginLib import JSONPlugin
-from HydraLib.HydraException import HydraPluginError
-from HydraLib.hydra_dateutil import reindex_timeseries
+
 from HydraLib import PluginLib
 
 from HydraLib.PluginLib import write_progress, write_output
 from PywrJsonReader import import_net
-
-
-
-
-from decimal import Decimal
-
-import json
-
 import logging
 import argparse as ap
 
@@ -58,7 +81,7 @@ if __name__ == '__main__':
     steps=6
     write_progress(1, steps)
 
-    #try:
+  #  try:
     parser = commandline_parser()
     write_progress(2, steps)
 
@@ -68,10 +91,7 @@ if __name__ == '__main__':
 
     connector=HydraConnector(args)
     write_progress(4, steps)
-    print "JOSN ===>", args.json_file
-    #with open(args.json_file) as data_file:
-    #    data = json.load(data_file)
-    #json.loads(args.json_file)
+
 
     network=import_net(args.json_file, connector.connection)
     write_progress(5, steps)
@@ -79,9 +99,9 @@ if __name__ == '__main__':
     text = PluginLib.create_xml_response('Pywr importer', (network.id), [network.scenarios[0].id],
                                          message="Data import was successful.",
                                          errors=[])
-#except Exception, e:
-        #error = [e.message]
-        #text = PluginLib.create_xml_response('Pywr importer', "", "", message="Error while importing data",errors=error)
+  #  except Exception, e:
+   # error = [e.message]
+   # text = PluginLib.create_xml_response('Pywr importer', "", "", message="Error while importing data",errors=error)
 
     write_progress(6, steps)
 

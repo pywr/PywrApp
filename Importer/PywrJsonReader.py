@@ -1,40 +1,45 @@
-import os
+import datetime
 import json
-import jsonpickle
+import os
 import random
 from collections import namedtuple
+import jsonpickle
 from dateutil.parser import parse as prs
+from Lib.data_files_reader import read_data_file_column, read_tablesarray, read_data_file, read_timeseries,get_value_from_file
 from datetime import datetime
 from datetime import timedelta
-import datetime
 from HydraLib.HydraException import HydraPluginError
-from data_files_reader import read_data_file_column, get_h5DF_store, get_node_attr_values, read_hdf_file_column
+from Lib.utilities import get_dict, is_in_dict
 
 recourseAttributea =[]
 ref_parameters={}
-
-
 has_tablerecorder=False
 timeseries=None
 json_file__folder=[]
+tables={}
 
 class Counter(object):
     def __init__(self):
         self.id=-1
 
 class Project (object):
+    '''
+    Class contains the essential Hydra project elements
+    '''
     def __init__(self):
-        self.name="Pywer exported project at "+str(datetime.datetime.now())
+        self.name="Pywer exported project at "+str(datetime.now())
         self.status = 'A'
         self.description='Create by Pywr exporter'
 
 
 class Value (object):
+    '''
+    Attribute value
+    '''
     def __init__(self, value):
         self.value=value
         self.dimen='Dimensionless'
         self.unit='-'
-
 
 class Attribute (object):
     def __init__(self,name):
@@ -119,8 +124,10 @@ class Node(object):
         nodes_attributes [self.name]= attributes_
 
 class Link(object):
+    '''
+    Hydra link from pywr edge
+    '''
     def __init__(self, edge_, nodes_ids, counter, links_attributes):
-        print "Toz:===>>>",edge_[0], edge_[1]
         self.node_1_id = nodes_ids[edge_[0]]
         self.node_2_id = nodes_ids[edge_[1]]
         self.name = edge_[0] + '_' + edge_[1]
@@ -148,7 +155,21 @@ class Link(object):
         links_attributes[self.name]=attributes_
 
 class Network (object):
+    '''
+     Create Hydra network
+    '''
     def __init__(self, name, solver_name, project_id, counter, domains, recorders, network_attributes, timestepper,  metadata=None):
+        '''
+        :param name: network name
+        :param solver_name: pywr solver name, it will be added as network attribute
+        :param project_id: Hydra project id
+        :param counter: object contains id which is used to estimate attribute and scenario attributes ids
+        :param domains: doamin section inside pywr, it will be saved as network attributes
+        :param recorders: conatins pywr recorder section, some of them will be saved as network attributes
+        :param network_attributes: other network attributes
+        :param timestepper: pywr timestepper
+        :param metadata: pywr metadata
+        '''
         global has_tablerecorder
         attributes_={}
         self.project_id=project_id
@@ -158,6 +179,8 @@ class Network (object):
         if(metadata !=None):
             if ("title" in metadata):
                 self.name=metadata['title']
+            else:
+                self.name = name + '_' + str(datetime.now())
             if ( "description" in metadata):
                 self.description =metadata['description']
             if "author" in metadata:
@@ -165,7 +188,7 @@ class Network (object):
             if ("minimum_version" in metadata):
                 minimum_version = metadata['minimum_version']
         else:
-            self.name = name + '_' + str(datetime.datetime.now())
+            self.name = name + '_' + str(datetime.now())
             self.description = "Pywr network"
 
         self.id=-1
@@ -243,9 +266,12 @@ class Network (object):
         network_attributes[self.name] = attributes_
 
 class Scenario(object):
+    '''
+    Hydra scenario
+    '''
     def __init__(self):
         self.description="Created by PywrApp"
-        self.name="scenarion_" + str(datetime.datetime.now())
+        self.name="scenarion_" + str(datetime.now())
         self.resourcescenarios=[]
     def add_times(self, start_time, end_time, time_step):
         self.start_time = start_time
@@ -290,26 +316,10 @@ class Recorder(object):
             self.csvfile = record_['csvfile']
         if "url" in record_.keys():
             self.url = record_['url']
-        #####################################
         if "url" in record_.keys():
             self.url = record_['url']
         if "url" in record_.keys():
             self.url = record_['url']
-
-'''
-class Recorder(object):
-    def __init__(self, record_):
-        self.type = record_.type
-        if hasattr(record_, "recorders"):
-            self.recorders=record_.recorders
-            self.agg_func=record_.agg_func
-        else:
-            self.node=record_.node
-        if hasattr(record_, "timesteps"):
-            self.timesteps=record_.timesteps
-        if hasattr(record_, "comment"):
-            self.comment = record_.comment
-'''
 
 class Domain (object):
     def __init__(self, domain_):
@@ -317,6 +327,9 @@ class Domain (object):
         self.color=domain_.color
 
 def get_timeseriesdates(timestepper):
+    '''
+    return timeseries from pywr timestepper
+    '''
     start=prs(timestepper['start'])
     end=prs(timestepper['end'])
     timestep=(timestepper['timestep'])
@@ -326,61 +339,6 @@ def get_timeseriesdates(timestepper):
         timeseries.append(start)
         start = start + timedelta(days=timestep)
     return timeseries
-
-def read_data_file(url, column=None):
-    with open(os.path.join(url)) as f:
-        content = f.read().splitlines()
-        head = content[0].split(',')
-    if column is not None:
-        for i in range(0, len(head)):
-            if (head[i].strip().lower() == 'date' or head[i].strip().lower() == 'index'):
-                date_index = i
-            elif (head[i].strip().lower() == column.lower()):
-                value_index = i
-    else:
-        if (head[0].lower() == 'date' or head[0].lower() == 'Index'):
-            date_index = 0
-            value_index = 1
-        else:
-            date_index = 1
-            value_index = 0
-    return content, date_index, value_index
-
-
-def read_tablesarray(url, root, data_node):
-    ss = os.path.dirname(url)
-    if (ss == ''):
-        url = os.path.join(json_file__folder[0], url)
-    store=get_h5DF_store(url)
-    values_= get_node_attr_values(store, data_node, root)
-    return json.dumps( values_.tolist())
-
-def read_timeseries(url, name,  sheetname, column=None):
-    ss= os.path.dirname(url)
-    if(ss == ''):
-        url=os.path.join(json_file__folder[0], url)
-    values_ = read_data_file_column(url, name, column, sheetname)
-    '''
-    values={}
-    date_format = "%d/%m/%Y"
-
-    for date_ in values_:
-        date__ = get_datetime(date_)# datetime.datetime.strptime(date_, date_format)
-        values[str(date__)] = str(values_[date_])
-
-    content, date_index, value_index=read_data_file(url, column)
-    for i in range (1, len(content)):
-        if content[i]=="":
-            continue
-        lin=content[i].split(',')
-        if lin[0]=="":
-            continue
-        date__=datetime.datetime.strptime(lin[date_index], date_format)
-        values[str(date__)]=lin[value_index]
-'''
-    #return json.dumps({'0' :values})
-
-    return json.dumps({'0': values_})
 
 
 def read_seasonall(values_):
@@ -415,7 +373,7 @@ def read_seasonall(values_):
     else:
         keys_=values_.keys()
         for v in values_['values']:
-            dat=datetime.datetime(year, month, day)
+            dat=datetime(year, month, day)
             values[str(dat)]=v
             if(values_['type'].lower=='monthlyprofile'):
                 month+=1
@@ -438,6 +396,22 @@ def get_variable_attribute_type_and_value(value_, name, counter, attributes_, _t
 
 
 def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_attributes=None):
+    '''
+    Get the attributes types and values in form combatable with hydra
+    some pywr attributes are not recognized by hydra as they have more than one attributes
+    so, it will be disassemble them to single attributes and set some metadata to define them as pywr attributes
+    this ones will be assemebled again when creating Pywr Json string in PywrExporter
+    The user needs to be aware about diffrent pywr parameters types, to get more information use the this link:
+    https://pywr.github.io/pywr-docs/tutorial.html
+
+    :param value_: attribute value
+    :param name: attribute name
+    :param counter: object to set ids
+    :param attributes_: current attributes list
+    :param _type: attribute type (input or output, i.e. variable)
+    :param res_attributes: resources  attributes list
+    :return:
+    '''
     metadata = {}
     metadata['single'] = 'yes'
 
@@ -462,9 +436,6 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
         elif isinstance(value_, basestring):
             attr=is_in_dict(value_, ref_parameters)
             if attr != None:
-            #if(value_ in ref_parameters.keys()):
-                #toz   toz
-                #attr = ref_parameters[value_]
                 attr_type = attr.type
                 value = attr.value
                 metadata=json.loads(attr.metadata)
@@ -484,14 +455,34 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
         elif "type" in keys_:
             metadata['type'] = value_['type'].lower()
             if value_['type'].lower() =='constant':
-                value = str(value_['value'])
+                if 'value' in value_:
+                    value = str(value_['value'])
+                elif 'values' in value_:
+                    value = str(value_['values'])
+                elif 'url' in value_:
+                    url = value_['url']
+                    column = value_['column']
+                    index_col = value_['index_col']
+                    index = value_['index']
+                    #value = get_value_from_file(value_, json_file__folder)
+                    value = get_value_from_file(url, column, index_col,index, json_file__folder)
+                    if value==None:
+                        raise HydraPluginError("No value is found for: "+name)
+                elif 'table' in value_:
+                    url=tables[value_['table']]['url']
+                    column=value_['column']
+                    index=value_['index']
+                    index_col=tables[value_['table']]['index_col']
+                    value = get_value_from_file(url, column, index_col, index, json_file__folder)
+                    if value==None:
+                        raise HydraPluginError("No value is found for: "+name)
                 attr_type = 'scalar'
             elif value_['type'].lower() == "arrayindexed" or value_['type'].lower() == "dataframe" or value_['type'].lower() == "tablesarray":
                 metadata['type'] = value_['type']
                 if value_['type'].lower()=='tablesarray':
                     metadata['where']=value_['where']
                     metadata['node'] = value_['node']
-                    value=read_tablesarray(value_['url'], value_['where'] ,value_['node'])
+                    value=read_tablesarray(value_['url'], value_['where'] ,value_['node'], json_file__folder)
                     attr_type = 'array'
                 else:
                     attr_type = 'timeseries'
@@ -500,10 +491,11 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
                         sheetname=value_['sheetname']
                     if  "column" in value_:
                        url=os.path.join(json_file__folder[0], value_['url'])
-                       value = read_timeseries(url,sheetname,  name, value_['column'])
+                       value = read_timeseries(url,sheetname,  name, json_file__folder, value_['column'])
                        metadata['column']=value_['column']
                     else:
-                        value = read_timeseries(value_['url'], name, sheetname)
+                        print "222222222222222222222222222222222222"
+                        value = read_timeseries(value_['url'], name, sheetname, json_file__folder)
                 if  "parse_dates" in keys_:
                     metadata['parse_dates'] = str(value_['parse_dates'])
                 if "index_col" in keys_:
@@ -542,17 +534,18 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
     if "comment" in keys_:
         metadata['comment']=value_['comment']
     counter.id = counter.id - 1
+    print "====>", value_
     attributes_[name] = AttributeData(attr_type, value, '-', 'Dimensionless', metadata)
     if(res_attributes!=None):
         res_attributes.append(ResourceAttr(counter.id, name, _type))
         recourseAttributea.append(RecourseAttribute('NODE', counter.id, name , attributes_[name],'Dimensionless'))
 
-def is_in_dict(key_, dict_):
-    for k in dict_.keys():
-        if k.strip().lower()== key_.strip().lower():
-            return dict_[k]
-    return None
 
+'''
+The flowing functions are used to get specific pywr parameters in a hydra resource attributes
+functions names indicates the pywr parameter  
+Metadata is used to define description of the attributes which are used by pywr
+'''
 def get_aggregated_attribute(value_, name, counter, attributes_, _type, res_attributes=None):
     metadata={}
     type = 'array'
@@ -665,7 +658,6 @@ def get_recorderthreshold(value_, name, counter, attributes_, _type, res_attribu
         res_attributes.append(ResourceAttr(counter.id, name, _type))
         recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
 
-
 def get_controlcurveinterpolated_attributes(value_, name, counter, attributes_, _type, res_attributes):
     type = 'array'
     metadata = {}
@@ -691,7 +683,13 @@ def get_controlcurveinterpolated_attributes(value_, name, counter, attributes_, 
         recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
 
 def get_new_attributes(attrlist, c_attrlist):
-    vars_attr = ['received_water', 'storage', 'flow']
+    '''
+    Get the new attributes which are used in this model to add them to the Hydra
+    :param attrlist: Current Hydra attributes list
+    :param c_attrlist: Attributes
+    :return: new attributes list
+    '''
+    vars_attr = ['received_water', 'storage', 'flow', 'mean_flow']
     new_attr=[]
     to_be_added = []
     for var_attr in vars_attr:
@@ -717,53 +715,13 @@ def get_new_attributes(attrlist, c_attrlist):
 
     return new_attr
 
-def get_dict(obj):
-    if not  hasattr(obj,"__dict__"):
-        return obj
-    '''
-    if isinstance(obj, list):
-        print "IT IS A LIST ====>>>>>>>>"
-        for item in obj:
-            get_dict(item)
-    '''
-    result = {}
-    for key, val in obj.__dict__.items():
-
-        if key.startswith("_"):
-            continue
-        if isinstance(val, list):
-            element = []
-            for item in val:
-                element.append(get_dict(item))
-        else:
-            element = get_dict(obj.__dict__[key])
-        result[key] = element
-    return result
-
-
-def check_in_a_list(json_list):
-    for item in json_list:
-        if (type(item) is list):
-            check_in_a_list(item)
-        elif (type(item) is dict):
-            for kk in item.keys():
-                if (type(item[kk]) is list):
-                    check_in_a_list(item[kk])
-
-
-def test_for_invalid_keys_names(json_string):
-    main_json = json.loads(json_string)
-    for key in main_json.keys():
-        if (type(main_json[key]) is list):
-            for item in main_json[key]:
-                check_in_a_list(item)
-
-'''
-Add from and to nodes to hydra links 
-which is orginally pywr links nodes
-'''
-
 def adjust_links_nodes(nodes_to_links, not_added_links, nodes_ids):
+    '''
+    #Add from and to nodes to hydra links which is orginally pywr links nodes
+    :param nodes_to_links: dict contains pywr link nodes which has been save as hydra link
+    :param not_added_links: hydra edhes which are not added to hydra links as they have pywr linked node
+    :param nodes_ids: dict contains names as keys and id as values
+    '''
     for node_name in nodes_to_links.keys():
         for edge_ in not_added_links:
             if edge_[0]==node_name:
@@ -771,187 +729,207 @@ def adjust_links_nodes(nodes_to_links, not_added_links, nodes_ids):
             elif edge_[1]==node_name:
                 nodes_to_links[node_name].node_1_id= nodes_ids[edge_[0]]
 
+
 def import_net (filename, connector):
-        has_tablerecorder = False
-        json_list=[]
-        json_file__folder.append(os.path.dirname(filename))
-        counter=Counter()
-        recorders=[]
-        domains=[]
-        project_attributes = {}
-        nodes_types={}
-        links_types={}
-        nodes_vars_types = {'output': 'received_water', 'storage': 'storage', 'link': 'flow', 'reservoir': 'storage'}
+    '''
+    Main function which reads the pywr model JSON  string from a file
+    It will extracts the main network elements from it and set them in a form which is recognized by Hydra
+    then it will push to hydra database
+    :param filename: name of the file  which conatins the Json string
+    :param connector: a connector object which is used to communicates with Hydra
+    :return: When it runs successfully, i.e. reads the json string, creates Hydra network and its elements, pushed to Hydra
+    It will return a Hydra network summary
+    '''
+    has_tablerecorder = False
+    json_list=[]
+    # sometimes json string has include statment which include another file whcih contains the
+    # another JSON string, if it is the case it will be added to json_list to added them to the model
+    json_file__folder.append(os.path.dirname(filename))
+    counter=Counter()
+    recorders=[]
+    domains=[]
+    project_attributes = {}
+    nodes_types={}
+    links_types={}
+    # dict contains the main pywr variables according to the node type
+    nodes_vars_types = {'output': 'received_water', 'storage': 'storage', 'link': 'flow', 'reservoir': 'storage', 'input':'mean_flow'}
+    c_attrlist = connector.call('get_all_attributes', {})
+    nodes_attributes={}
+    links_attributes = {}
+    network_attributes={}
+    f = open(filename,'r')
+    json_string = ""
+    while 1:
+        line = f.readline()
+        if not line:break
+        json_string += line
+    f.close()
+    #test_for_invalid_keys_names(json_string)
+    main_json = json.loads(json_string)#, object_hook=lambda d: namedtuple('X', d.keys(), rename=False, verbose=False)(*d.values()))
+    json_list.append(main_json)
+    if "includes" in main_json:
+            for included_file in main_json['ncludes']:
+                ss = os.path.dirname(included_file )
+                if (ss == ''):
+                    included_file = os.path.join(json_file__folder[0], included_file)
+                included_f = open(included_file, 'r')
+                included_json_string = ""
+                while 1:
+                    line = included_f.readline()
+                    if not line: break
+                    included_json_string += line
+                included_f.close()
 
-        c_attrlist = connector.call('get_all_attributes', {})
-        nodes_attributes={}
-        links_attributes = {}
-        network_attributes={}
-        f = open(filename,'r')
-        json_string = ""
-        while 1:
-            line = f.readline()
-            if not line:break
-            json_string += line
-        f.close()
-        test_for_invalid_keys_names(json_string)
-        main_json = json.loads(json_string)#, object_hook=lambda d: namedtuple('X', d.keys(), rename=False, verbose=False)(*d.values()))
-        json_list.append(main_json)
-        if "includes" in main_json:
-                for included_file in main_json['ncludes']:
-                    ss = os.path.dirname(included_file )
-                    if (ss == ''):
-                        included_file = os.path.join(json_file__folder[0], included_file)
-                    included_f = open(included_file, 'r')
-                    included_json_string = ""
-                    while 1:
-                        line = included_f.readline()
-                        if not line: break
-                        included_json_string += line
-                    included_f.close()
-
-                    included_x = json.loads(included_json_string , object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
-                    json_list.append(included_x)
+                included_x = json.loads(included_json_string , object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
+                json_list.append(included_x)
 
 
-                    if ("nodes" in included_x):
-                        for node in included_x['nodes']:
-                            main_json.nodes.append(node)
+                if ("nodes" in included_x):
+                    for node in included_x['nodes']:
+                        main_json.nodes.append(node)
 
-                    if "edges" in included_x:
-                        for edge in included_x['edges']:
-                            main_json.edges.append(edge)
-                    #if hasattr(included_x, "parameters"):
-                    #    for key_ in included_x.parameters:
-                    #        if hasattr(main_json, "parameters"):
-                    #           main_json.parameters[key_]=included_x.parameters[key_]
+                if "edges" in included_x:
+                    for edge in included_x['edges']:
+                        main_json.edges.append(edge)
+                #if hasattr(included_x, "parameters"):
+                #    for key_ in included_x.parameters:
+                #        if hasattr(main_json, "parameters"):
+                #           main_json.parameters[key_]=included_x.parameters[key_]
 
-        global timeseries
-        if "timestepper" in main_json:
-            timeseries=get_timeseriesdates(main_json['timestepper'])
-        project=Project()
-        request=jsonpickle.dumps(project).replace("/","_").replace("\"", '\'')
-        Proj = connector.call('add_project', {'project': project.__dict__})
-        if ("recorders" in main_json):
-            rcds=get_dict(main_json['recorders'])
-            for kk in rcds.keys():
-                recorders.append(Recorder(kk, rcds[kk]))
+    global timeseries
+    if "timestepper" in main_json:
+        timeseries=get_timeseriesdates(main_json['timestepper'])
+    project=Project()
+    request=jsonpickle.dumps(project).replace("/","_").replace("\"", '\'')
+    Proj = connector.call('add_project', {'project': project.__dict__})
+    if ("recorders" in main_json):
+        rcds=get_dict(main_json['recorders'])
+        for kk in rcds.keys():
+            recorders.append(Recorder(kk, rcds[kk]))
 
-        if ( "domains" in main_json):
-            for domain_ in main_json['domains']:
-                domains.append(Domain(domain_))
+    if ( "domains" in main_json):
+        for domain_ in main_json['domains']:
+            domains.append(Domain(domain_))
 
-        timestepper=None
-        if ("timestepper" in main_json):
-            timestepper = main_json['timestepper']
+    if ("tables" in main_json):
+        for table in main_json['tables']:
+            tables[table]= main_json['tables'][table]
 
-        solver_name=None
-        if ("solver" in main_json):
-            solver_name=main_json['solver']
+    timestepper=None
+    if ("timestepper" in main_json):
+        timestepper = main_json['timestepper']
 
-        if ("metadata" in main_json):
-            network = Network('Pywr',solver_name, Proj.id, counter, domains, recorders, network_attributes,
-                              timestepper, main_json['metadata'])
+    solver_name=None
+    if ("solver" in main_json):
+        solver_name=main_json['solver']
+
+    if ("metadata" in main_json):
+        network = Network('Pywr',solver_name, Proj.id, counter, domains, recorders, network_attributes,
+                          timestepper, main_json['metadata'])
+    else:
+        network = Network('Pywr', solver_name, Proj.id, counter, domains, recorders, network_attributes,
+                          timestepper)
+    #add new new network attributes to project attributes
+    for attr_name in network_attributes[network.name].keys():
+        if (attr_name in project_attributes):
+            pass
         else:
-            network = Network('Pywr', solver_name, Proj.id, counter, domains, recorders, network_attributes,
-                              timestepper)
+            attr = Attribute(attr_name)
+            project_attributes[attr_name] = attr
 
-        for attr_name in network_attributes[network.name].keys():
-            if (attr_name in project_attributes):
+    counter.id=counter.id-1;
+    nodes_ids={}
+    #dict contains nodes names as keys and nodes ids as values
+    i = 0
+    for json_ in json_list:
+        #print "Parameters section is found...."
+        if ("parameters" in json_):
+            for i in range(0, len(json_['parameters'].keys())):
+                k = json_['parameters'].keys()[i]
+                counter.id = counter.id - 1
+                get_attribute_type_and_value(json_['parameters'].values()[i], k, counter, ref_parameters, 'default')
+    nodes_to_links={}
+    # dict to saves pywr links which are saved as Hydra nodes,
+    # It will be used later to check the edges section
+    not_added_links=[]
+    # list used to store the edges which is not added to hydra links
+    # because they contains from and to nodes for links nodes
+    # It will be used to adjust the hydra links
+    for node_ in main_json['nodes']:
+        node_records=[]
+        for rec in recorders:
+             if hasattr (rec, "node"):
+                if rec.node==node_['name']:
+                     node_records.append(rec)
+        node = Node(node_, counter, nodes_attributes, node_records, nodes_vars_types)
+        #check node type and if it is a link it will be added to the links instaed of nodes list
+        #to do applay the same for rivers
+        if node.type=='link':
+            print "Link is dected within nodes ....", node.name
+            if node.type not in links_types:
+                links_types[node.type] = [node.name]
+            else:
+                links_types[node.type].append(node.name)
+            network.links.append(node)
+            nodes_to_links[node.name]=node
+        else:
+            print "It is not link", node.name
+            nodes_ids[node_['name']] = node.id
+            if node.type in nodes_types.keys():
+                nodes_types[node.type].append(node.name)
+            else:
+                nodes_types[node.type] = [node.name]
+            network.nodes.append(node)
+
+        counter.id = counter.id - 1
+        for attr_name in nodes_attributes[node.name].keys():
+            if( attr_name in project_attributes):
                 pass
             else:
-                attr = Attribute(attr_name)
-                project_attributes[attr_name] = attr
+                attr=Attribute(attr_name)
+                project_attributes[attr_name]=attr
+    ## add pywr edges to hydra network links
+    for edge_ in main_json['edges']:
+       if edge_[0] in nodes_to_links or edge_[1] in nodes_to_links:
+           not_added_links.append(edge_)
+           continue
+       link=Link(edge_, nodes_ids, counter, links_attributes)
+       if link.type not in links_types:
+           links_types[link.type]=[link.name]
+       else:
+           links_types[link.type].append(link.name)
+       counter.id = counter.id - 1
+       network.links.append(link)
+       for attr_name in links_attributes[link.name].keys():
+           if (attr_name not in project_attributes):
+               attr = Attribute(attr_name)
+               project_attributes[attr_name] = attr
+    adjust_links_nodes(nodes_to_links, not_added_links, nodes_ids)
+    new_attr = get_new_attributes(project_attributes.values(), c_attrlist)
+    attributes = connector.call('add_attributes', {'attrs': new_attr})
+    attrs_names_ids={}
+    for tt in attributes:
+        attrs_names_ids[tt.name]=tt.id
+    for rs in recourseAttributea:
+        try:
+            rs.attr_id=attrs_names_ids[rs.attr_id]
+        except:
+            print "Not found-------------->", rs.attr_id
+    network.scenarios[0].resourcescenarios=recourseAttributea
 
-        counter.id=counter.id-1;
-        nodes_ids={}
-        i = 0
-        for json_ in json_list:
-            #print "Parameters section is found...."
-            if ("parameters" in json_):
-                for i in range(0, len(json_['parameters'].keys())):
-                    k = json_['parameters'].keys()[i]
-                    counter.id = counter.id - 1
-                    get_attribute_type_and_value(json_['parameters'].values()[i], k, counter, ref_parameters, 'default')
-
-        #dict to saves pywr links which will be saved as Hydra nodes,
-        # It will be used later to check the edges section
-        nodes_to_links={}
-        #list used to store the edges which is not used and used
-        #add from and to nodes for links nodes
-        not_added_links=[]
-        for node_ in main_json['nodes']:
-            node_records=[]
-            for rec in recorders:
-                 if hasattr (rec, "node"):
-                    if rec.node==node_['name']:
-                         node_records.append(rec)
-            node = Node(node_, counter, nodes_attributes, node_records, nodes_vars_types)
-            #check for node type and if it is a link or river it will be added to the links instaed of nodes list
-            if node.type=='link' or node.type=='river':
-                print "Link is dected within nodes ....", node.name
-                if node.type not in links_types:
-                    links_types[node.type] = [node.name]
-                else:
-                    links_types[node.type].append(node.name)
-                network.links.append(node)
-                nodes_to_links[node.name]=node
-            else:
-                print "It is not link", node.name
-                nodes_ids[node_['name']] = node.id
-                if node.type in nodes_types.keys():
-                    nodes_types[node.type].append(node.name)
-                else:
-                    nodes_types[node.type] = [node.name]
-                network.nodes.append(node)
-
-            counter.id = counter.id - 1
-            for attr_name in nodes_attributes[node.name].keys():
-                if( attr_name in project_attributes):
-                    pass
-                else:
-                    attr=Attribute(attr_name)
-                    project_attributes[attr_name]=attr
-        for edge_ in main_json['edges']:
-           if edge_[0] in nodes_to_links or edge_[1] in nodes_to_links:
-               not_added_links.append(edge_)
-               continue
-           link=Link(edge_, nodes_ids, counter, links_attributes)
-           if link.type not in links_types:
-               links_types[link.type]=[link.name]
-           else:
-               links_types[link.type].append(link.name)
-           counter.id = counter.id - 1
-           network.links.append(link)
-           for attr_name in links_attributes[link.name].keys():
-               if (attr_name not in project_attributes):
-                   attr = Attribute(attr_name)
-                   project_attributes[attr_name] = attr
-        new_attr = get_new_attributes(project_attributes.values(), c_attrlist)
-        adjust_links_nodes(nodes_to_links, not_added_links, nodes_ids)
-        attributes = connector.call('add_attributes', {'attrs': new_attr})
-        attrs_names_ids={}
-        for tt in attributes:
-            attrs_names_ids[tt.name]=tt.id
-        for rs in recourseAttributea:
-            try:
-                rs.attr_id=attrs_names_ids[rs.attr_id]
-            except:
-                print "Not found-------------->", rs.attr_id
-        network.scenarios[0].resourcescenarios=recourseAttributea
-
-        for rs in network.attributes:
+    for rs in network.attributes:
+        rs.attr_id = attrs_names_ids[rs.attr_id]
+    for node in network.nodes:
+        for rs in node.attributes:
+            rs.attr_id=attrs_names_ids[rs.attr_id]
+    for link in network.links:
+        for rs in link.attributes:
             rs.attr_id = attrs_names_ids[rs.attr_id]
-        for node in network.nodes:
-            for rs in node.attributes:
-                rs.attr_id=attrs_names_ids[rs.attr_id]
-        for link in network.links:
-            for rs in link.attributes:
-                rs.attr_id = attrs_names_ids[rs.attr_id]
-
-        NetworkSummary = connector.call('add_network', {'net': get_dict(network)})
-        set_resource_types(nodes_types, links_types, network.type, NetworkSummary, connector)
-        return NetworkSummary
+    #Push the network to Hydra
+    NetworkSummary = connector.call('add_network', {'net': get_dict(network)})
+    #Push pywr template to Hydra and set nodes and links types
+    set_resource_types(nodes_types, links_types, network.type, NetworkSummary, connector)
+    return NetworkSummary
 
 
 '''
@@ -998,7 +976,7 @@ def set_resource_types(nodes_types, links_types, networktype, NetworkSummary, co
     if NetworkSummary.get('nodes', []):
         for node in NetworkSummary['nodes']:
             for typename, node_name_list in nodes_types.items():
-                if type_ids[typename] and node.name in node_name_list:
+                if typename in type_ids and node.name in node_name_list:
                     args.append(dict(
                         ref_key = 'NODE',
                         ref_id  = node.id,
