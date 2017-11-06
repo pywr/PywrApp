@@ -32,7 +32,7 @@ Option                 Short  Parameter  Description
 
 Example:
 =========
-        -t 16 -s 16 -p "C:\ProgramData\Anaconda3\envs\pywr"
+       Python PywrAuto -t 16 -s 16 -p "C:\ProgramData\Anaconda3\envs\pywr"
 '''
 
 import os

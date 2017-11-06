@@ -48,7 +48,7 @@ network topologies and data to a file readable by Pywr.
 Examples:
 =========
 Exporting use time axis:
- python GAMSExport.py -t 16 -s 16  -o "c:\temp\example_2.json"
+ python PywrExport.py -t 16 -s 16  -o "c:\temp\example_2.json"
 
 """
 

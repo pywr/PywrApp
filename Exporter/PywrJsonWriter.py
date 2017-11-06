@@ -317,12 +317,11 @@ def get_timesreies_values(value, column, metadata):
         for ts in (vv[key].keys()):
             dated_dict[parser.parse(ts)]=ts
 
-        ll=dated_dict.keys()
-        ll.sort()
+        ll=sorted(dated_dict.keys())
 
         for date_ in ll:
             date=dated_dict[date_]
-            print "Date: ", (date_)
+            print "Date: ", (date_), date
             if(date.startswith('9999') ):
                 if(type_ == "monthlyprofile"):
                     values['type'] = type_
