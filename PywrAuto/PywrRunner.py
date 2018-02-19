@@ -48,6 +48,7 @@ def load_model(file_name):
                     for items in record.data:
                         _type=items.__class__.__name__
                         if _type=="ndarray":
+                            file.write(",array" )
                             for item in items:
                                 file.write ("," + str(item))
                         else:

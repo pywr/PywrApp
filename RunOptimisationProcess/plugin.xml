@@ -6,10 +6,10 @@
     <plugin_shell>python</plugin_shell>
     <plugin_location>.</plugin_location>
     <plugin_description>
-        Run a pywr model with a pywr-compatible hydra network. 
+        Run an optmization process using pywr-to-borg code  with a pywr-compatible hydra network. 
 	</plugin_description>
-	<smallicon>pywr_export_16.png</smallicon>
-    <largeicon>pywr_export_32.png</largeicon>
+	<smallicon>pywr_optmization_16.png</smallicon>
+    <largeicon>pywr_optmization_32.png</largeicon>
     <plugin_epilog>For more information visit hydra platform website</plugin_epilog>
 	<mandatory_args>
 		<arg>
@@ -43,6 +43,14 @@
             <allownew>N</allownew>
             <argtype>directory</argtype>
             <help>path to python 3</help>
+        </arg>
+		<arg>
+            <name>optmisation-runner-code</name>
+            <switch>-o</switch>
+            <multiple>N</multiple>
+            <allownew>N</allownew>
+            <argtype>file</argtype>
+            <help>python code which is used to the run the optmisation process.</help>
         </arg>
     </mandatory_args>
    <non_mandatory_args>

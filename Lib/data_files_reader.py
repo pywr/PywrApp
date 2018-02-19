@@ -3,6 +3,8 @@ import json
 import pandas as pd
 from HydraLib.hydra_dateutil import get_datetime
 import datetime
+from dateutil import parser
+
 
 
 from HydraLib.HydraException import HydraPluginError
@@ -12,16 +14,21 @@ def check_file(url):
         raise HydraPluginError("File: " + url + ' is not found !!!')
 
 def get_the_res_data(url, attribute, res, data):
+    print "DATA   +++++>>>>",data
     if res==None:
-        res='Data'
+        if 'Data' in data.columns:
+            res='Data'
+        elif attribute in data.columns:
+            res=attribute
     if res in data.columns:
-        ss=[]
         values={}
-        for k in data[res].to_dict():
-            ss.append(str(k)+','+str(data[res].to_dict()[k]))
-            values[str(get_datetime(k))]=str(data[res].to_dict()[k])
+        for k in sorted(data[res].to_dict()):
+            #print "kkkk",k, get_datetime(k), parser.parse(k, r"%d/%m/%Y"), pd.to_datetime(k)
+            values[k]=str(data[res].to_dict()[k])
+        #print "<<<====>>>", values.keys()
         return values
     else:
+        print data.columns, "===>>",res, attribute
         error = attribute + ' for resource: ' + res + ' is not found in the file: ' + url
         raise HydraPluginError(error)
 
@@ -29,6 +36,7 @@ def get_the_res_data(url, attribute, res, data):
 def read_data_file_column(url, attribute, res, sheetname, index_=0):
     extension = os.path.splitext(url)[1][1:]
     if(extension.lower().strip()=='csv'):
+        print "Res: ", res
         return read_csv_file_column(url, attribute, res, index_)
     elif (extension.lower().strip() == 'xlsx' or extension.lower().strip() == 'xls'):
         return read_excel_file_column(url, attribute, res,sheetname, index_)
@@ -41,9 +49,20 @@ def read_timeseries(url, name,  sheetname, json_file__folder, column=None):
     ss= os.path.dirname(url)
     if(ss == ''):
         url=os.path.join(json_file__folder[0], url)
+    print "attribute", sheetname, column
     values_ = read_data_file_column(url, name, column, sheetname)
     return json.dumps({'0': values_})
 
+
+def read_timeseries_for_scenarios(url, name, scenario,  sheetname, json_file__folder, column=None):
+    ss= os.path.dirname(url)
+    if(ss == ''):
+        url=os.path.join(json_file__folder[0], url)
+    size=scenario['size']
+    values={}
+    for co in range (0, size):
+        values[co] = read_data_file_column(url, name, str(co), sheetname)
+    return json.dumps({'0': values})
 
 def read_data_file(url, column=None):
     with open(os.path.join(url)) as f:
@@ -70,6 +89,7 @@ def read_tablesarray(url, root, data_node, json_file__folder):
         url = os.path.join(json_file__folder[0], url)
     store=get_h5DF_store(url)
     values_= get_node_attr_values(store, data_node, root)
+    print values_
     return json.dumps(values_.tolist())
 
 def read_hdf_file_column(url, attribute, res, index_=0):
@@ -83,8 +103,11 @@ def read_hdf_file_column(url, attribute, res, index_=0):
 
 def read_csv_file_column(url, attribute, res, index_=0):
     check_file(url)
+    print "url", url
     try:
-        data=pd.read_csv(url, index_col=index_,parse_dates=True )
+        print "RES:", res
+        data=pd.read_csv(url, index_col=index_)
+        print data
     except:
         raise HydraPluginError("Error while reading: "+url+' to get attribute: '+attribute)
     return  get_the_res_data(url, attribute, res, data)

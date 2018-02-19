@@ -1,3 +1,8 @@
+import os
+import subprocess
+import time
+from HydraLib.PluginLib import HydraPluginError
+from dateutil import parser as prs
 
 
 def get_dict(obj):
@@ -39,4 +44,13 @@ def is_in_dict(key_, dict_):
             return dict_[k]
     return None
 
+def check_output_file(results_file, start_time):
+    if os.path.isfile(results_file) == False:
+        raise HydraPluginError('No Output file is found ('+results_file+')')
+    dt = prs.parse(time.ctime(os.path.getmtime(results_file)))
 
+    delta = (dt - start_time).total_seconds()
+    if delta >= 0:
+        pass
+    else:
+        raise HydraPluginError('No updated Output file is found')

@@ -5,7 +5,7 @@ import random
 from collections import namedtuple
 import jsonpickle
 from dateutil.parser import parse as prs
-from Lib.data_files_reader import read_data_file_column, read_tablesarray, read_data_file, read_timeseries,get_value_from_file
+from Lib.data_files_reader import read_data_file_column, read_tablesarray, read_data_file, read_timeseries,get_value_from_file, read_timeseries_for_scenarios
 from datetime import datetime
 from datetime import timedelta
 from HydraLib.HydraException import HydraPluginError
@@ -17,6 +17,7 @@ has_tablerecorder=False
 timeseries=None
 json_file__folder=[]
 tables={}
+scenarios={}
 
 class Counter(object):
     def __init__(self):
@@ -82,6 +83,7 @@ class Node(object):
 
         for recorder in recorders:
             dict=get_dict(recorder)
+            print "dict===>>", dict
             if('node' in dict.keys()):
                 del dict["node"]
             del dict['name']
@@ -170,7 +172,9 @@ class Network (object):
         :param timestepper: pywr timestepper
         :param metadata: pywr metadata
         '''
+        print "recorders:=>>", get_dict(recorders)
         global has_tablerecorder
+        global scenarios
         attributes_={}
         self.project_id=project_id
         self.type='PywrNetwork'
@@ -249,19 +253,47 @@ class Network (object):
 
         recorders_list=[]
         metadata_={}
-        for recorder in recorders:
-            if (recorder.name.lower().strip()=="database" or recorder.type=='CSVRecorder') and not hasattr(recorder, "node"):
-                dic=get_dict(recorder)
-                print "2. Rec ====>", get_dict(recorder)
+        for scenario in scenarios:
+            metadata = {}
+            name=scenarios[scenario]['name']
+            metadata['type']='scenario'
+            for key in scenarios[scenario]:
+                #set metadata value as a string, otherwise, the server will throws
+                #StatementError, type error
+                metadata[key] = str(scenarios[scenario][key])
+            print "global scenarios", scenario, scenarios[scenario]
+            print metadata
+            counter.id = counter.id - 1
+            attributes_[name] = AttributeData("descriptor", name, '-', 'Dimensionless', metadata)
+            #type, value, unit, dimen,
+            self.attributes.append(ResourceAttr(counter.id, name, 'Input'))
+            recourseAttributea.append(
+                RecourseAttribute('NETWORK', counter.id, name, attributes_[name], 'Dimensionless'))
 
+        for recorder in recorders:
+            print "1. from network ===>>>", get_dict(recorder)
+            if (recorder.name.lower().strip()=="database" or recorder.type=='CSVRecorder') or recorder.type=='polynomial1dcost' and not hasattr(recorder, "node"):
+                print "2. from network ===>>>", get_dict(recorder)
+                dic=get_dict(recorder)
                 metadata={}
                 for key in dic:
                     if key!="name":
-                        metadata[key]=dic[key]
+                        #if key =='coefficients':
+                        if type(dic[key]) is list:
+                            metadata[key]=json.dumps(dic[key])
+                        elif type(dic[key]) is float :
+                            metadata[key] = str(dic[key])
+                        else:
+                            metadata[key] = dic[key]
                 counter.id = counter.id - 1
-                attributes_['recorder'] = AttributeData("descriptor", "database", '-', 'Dimensionless', metadata)
-                self.attributes.append(ResourceAttr(counter.id, "recorder", 'Input'))
-                recourseAttributea.append(RecourseAttribute('NETWORK', counter.id, 'recorder', attributes_['recorder'], 'Dimensionless'))
+                if 'name' in dic:
+                    p_name=dic['name']
+                else:
+                    p_name='database'
+                metadata['is_recorder']='True'
+                attributes_[p_name] = AttributeData("descriptor", p_name, '-', 'Dimensionless', metadata)
+                self.attributes.append(ResourceAttr(counter.id, p_name, 'Input'))
+                recourseAttributea.append(RecourseAttribute('NETWORK', counter.id, p_name, attributes_[p_name], 'Dimensionless'))
                 has_tablerecorder=True
         network_attributes[self.name] = attributes_
 
@@ -300,6 +332,7 @@ class AttributeData (object):
 
 class Recorder(object):
     def __init__(self, name, record_):
+        global ref_parameters
         self.name=name
         if "type" in record_.keys():
             self.type = record_['type']
@@ -320,6 +353,23 @@ class Recorder(object):
             self.url = record_['url']
         if "url" in record_.keys():
             self.url = record_['url']
+        if "months" in record_.keys():
+            self.months = record_['months']
+        if "percentiles" in record_.keys():
+            self.percentiles = record_['percentiles']
+        if 'agg_func'in  record_.keys():
+            self.agg_func=record_['agg_func']
+        if 'is_constraint' in record_.keys():
+            self.is_constraint=bool(record_['is_constraint'])
+        if 'is_objective' in record_.keys():
+            self.is_objective=record_['is_objective']
+        if 'coefficients' in record_.keys():
+            self.coefficients=record_['coefficients']
+        if 'epsilon' in record_.keys():
+            self.epsilon=record_['epsilon']
+        if'parameter' in record_.keys():
+            self.parameter=record_['parameter']
+        print "results", get_dict(self)
 
 class Domain (object):
     def __init__(self, domain_):
@@ -394,14 +444,13 @@ def get_variable_attribute_type_and_value(value_, name, counter, attributes_, _t
         res_attributes.append(ResourceAttr(counter.id, name, _type))
         recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
 
-
 def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_attributes=None):
     '''
     Get the attributes types and values in form combatable with hydra
     some pywr attributes are not recognized by hydra as they have more than one attributes
     so, it will be disassemble them to single attributes and set some metadata to define them as pywr attributes
     this ones will be assemebled again when creating Pywr Json string in PywrExporter
-    The user needs to be aware about diffrent pywr parameters types, to get more information use the this link:
+    The user needs to be aware about diffrent pywr parameters types, you can get more information from:
     https://pywr.github.io/pywr-docs/tutorial.html
 
     :param value_: attribute value
@@ -414,7 +463,8 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
     '''
     metadata = {}
     metadata['single'] = 'yes'
-
+    global scenarios
+    global ref_parameters
     if type(value_) is dict:
         keys_=value_.keys()
     else:
@@ -436,10 +486,12 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
         elif isinstance(value_, basestring):
             attr=is_in_dict(value_, ref_parameters)
             if attr != None:
+                print "FOUND IT", value_
                 attr_type = attr.type
                 value = attr.value
                 metadata=json.loads(attr.metadata)
-                if( 'type' in metadata.keys()):
+                metadata['ref_name']=value_
+                if('type' in metadata.keys()):
                     if(metadata['type']=='aggregated'):
                         get_aggregated(json.loads(value), counter, attributes_, _type, res_attributes)
                     elif(metadata['type']=='indexedarray'):
@@ -484,6 +536,12 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
                     metadata['node'] = value_['node']
                     value=read_tablesarray(value_['url'], value_['where'] ,value_['node'], json_file__folder)
                     attr_type = 'array'
+                    if len(scenarios) > 0 and 'scenario' in value_:
+                        if 'scenario' in value_.keys():
+                            #Will chanmg ethe tyoe to dataframe when export the json from hydra
+                            #with scenario needs to be changed
+                            metadata["scenario"] = value_['scenario']
+
                 else:
                     attr_type = 'timeseries'
                     sheetname=None
@@ -494,8 +552,18 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
                        value = read_timeseries(url,sheetname,  name, json_file__folder, value_['column'])
                        metadata['column']=value_['column']
                     else:
-                        print "222222222222222222222222222222222222"
-                        value = read_timeseries(value_['url'], name, sheetname, json_file__folder)
+                        if len(scenarios)>0 and  'scenario' in value_:
+                            if 'checksum' in value_.keys():
+                                '''
+                                ToDo implement checksum for files
+                                '''
+                                pass
+
+                            if 'scenario' in value_.keys():
+                                metadata["scenario"] = value_['scenario']
+                            value =read_timeseries_for_scenarios(value_['url'], name, scenarios[value_['scenario']], sheetname, json_file__folder)
+                        else:
+                            value = read_timeseries(value_['url'], name, sheetname, json_file__folder)
                 if  "parse_dates" in keys_:
                     metadata['parse_dates'] = str(value_['parse_dates'])
                 if "index_col" in keys_:
@@ -516,7 +584,6 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
                 return
             elif value_['type'].lower() == 'indexedarray':
                 get_indexedarray_attributes(value_, name, counter, attributes_, _type,  res_attributes)
-
                 return
             elif value_['type'].lower() == 'controlcurveindex':
                 get_controlcurveindex_attributes(value_, name, counter, attributes_, _type, res_attributes)
@@ -530,16 +597,29 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
             elif value_['type'].lower() == 'recorderthreshold':
                 get_recorderthreshold(value_, name, counter, attributes_, _type, res_attributes)
                 return
+            elif value_['type']=='constantscenario':
+                get_constantscenario(value_, name, counter, attributes_, _type, res_attributes)
+                return
+            elif value_['type']=='annualharmonicseries':
+                get_Annualharmonicseries(value_, name, counter, attributes_, _type, res_attributes)
+                return
 
     if "comment" in keys_:
         metadata['comment']=value_['comment']
     counter.id = counter.id - 1
-    print "====>", value_
+    if type(value_) is dict:
+        add_metdata(value_, metadata)
+
     attributes_[name] = AttributeData(attr_type, value, '-', 'Dimensionless', metadata)
     if(res_attributes!=None):
         res_attributes.append(ResourceAttr(counter.id, name, _type))
         recourseAttributea.append(RecourseAttribute('NODE', counter.id, name , attributes_[name],'Dimensionless'))
 
+def add_metdata(value_, metadata):
+    for key in value_:
+        if is_in_dict(key, metadata) ==None:
+            print value_[key]
+            metadata[key]=str(value_[key])
 
 '''
 The flowing functions are used to get specific pywr parameters in a hydra resource attributes
@@ -596,7 +676,6 @@ def get_indexedarray(params, name, counter, attributes_, _type, res_attributes=N
         get_attribute_type_and_value(item, name_, counter, attributes_, _type, res_attributes)
         index_list.append(name_)
     return index_list
-
 
 def get_controlcurveindex_attributes(value_, name, counter, attributes_, _type, res_attributes):
     metadata = {}
@@ -682,6 +761,42 @@ def get_controlcurveinterpolated_attributes(value_, name, counter, attributes_, 
         res_attributes.append(ResourceAttr(counter.id, name, _type))
         recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
 
+def get_metadate_value(values, key):
+    try:
+        return json.dumps(values[key])
+    except:
+        raise HydraPluginError("No value is found for: "+key)
+
+def get_Annualharmonicseries(value_, name, counter, attributes_, _type, res_attributes):
+    type='array'
+    metadata = {}
+    metadata['single'] = 'yes'
+    metadata['type']='annualharmonicseries'
+    value = {}
+    value['mean']=value_['mean']
+    value['amplitudes']=value_['amplitudes']
+    value['phases']=value_['phases']
+    attr = AttributeData(type, json.dumps(value), '-', 'Dimensionless', metadata)
+    attributes_[name] = attr
+    counter.id = counter.id - 1
+    if (res_attributes != None):
+        res_attributes.append(ResourceAttr(counter.id, name, _type))
+        recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
+
+def get_constantscenario(value_, name, counter, attributes_, _type, res_attributes):
+    type='array'
+    metadata = {}
+    metadata['single'] = 'yes'
+    metadata['type']='constantscenario'
+    metadata['scenario']=value_['scenario']
+    value = value_['values']
+    attr = AttributeData(type, json.dumps(value), '-', 'Dimensionless', metadata)
+    attributes_[name] = attr
+    counter.id = counter.id - 1
+    if (res_attributes != None):
+        res_attributes.append(ResourceAttr(counter.id, name, _type))
+        recourseAttributea.append(RecourseAttribute('NODE', counter.id, name, attributes_[name], 'Dimensionless'))
+
 def get_new_attributes(attrlist, c_attrlist):
     '''
     Get the new attributes which are used in this model to add them to the Hydra
@@ -729,7 +844,6 @@ def adjust_links_nodes(nodes_to_links, not_added_links, nodes_ids):
             elif edge_[1]==node_name:
                 nodes_to_links[node_name].node_1_id= nodes_ids[edge_[0]]
 
-
 def import_net (filename, connector):
     '''
     Main function which reads the pywr model JSON  string from a file
@@ -750,9 +864,10 @@ def import_net (filename, connector):
     domains=[]
     project_attributes = {}
     nodes_types={}
+    global ref_parameters
     links_types={}
     # dict contains the main pywr variables according to the node type
-    nodes_vars_types = {'output': 'received_water', 'storage': 'storage', 'link': 'flow', 'reservoir': 'storage', 'input':'mean_flow'}
+    nodes_vars_types = {'output': 'received_water', 'storage': 'storage', 'link': 'flow', 'reservoir': 'storage', 'input':'mean_flow', 'catchment':'seasonal_fdc'}
     c_attrlist = connector.call('get_all_attributes', {})
     nodes_attributes={}
     links_attributes = {}
@@ -783,7 +898,6 @@ def import_net (filename, connector):
                 included_x = json.loads(included_json_string , object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
                 json_list.append(included_x)
 
-
                 if ("nodes" in included_x):
                     for node in included_x['nodes']:
                         main_json.nodes.append(node)
@@ -799,6 +913,12 @@ def import_net (filename, connector):
     global timeseries
     if "timestepper" in main_json:
         timeseries=get_timeseriesdates(main_json['timestepper'])
+
+    global scenarios
+    if "scenarios" in main_json:
+        for scenario in main_json['scenarios']:
+            scenarios[scenario['name']]={"name": scenario['name'], "size": scenario['size']}
+
     project=Project()
     request=jsonpickle.dumps(project).replace("/","_").replace("\"", '\'')
     Proj = connector.call('add_project', {'project': project.__dict__})
@@ -807,7 +927,7 @@ def import_net (filename, connector):
         for kk in rcds.keys():
             recorders.append(Recorder(kk, rcds[kk]))
 
-    if ( "domains" in main_json):
+    if ("domains" in main_json):
         for domain_ in main_json['domains']:
             domains.append(Domain(domain_))
 
@@ -837,7 +957,7 @@ def import_net (filename, connector):
             attr = Attribute(attr_name)
             project_attributes[attr_name] = attr
 
-    counter.id=counter.id-1;
+    counter.id=counter.id-1
     nodes_ids={}
     #dict contains nodes names as keys and nodes ids as values
     i = 0
@@ -848,6 +968,7 @@ def import_net (filename, connector):
                 k = json_['parameters'].keys()[i]
                 counter.id = counter.id - 1
                 get_attribute_type_and_value(json_['parameters'].values()[i], k, counter, ref_parameters, 'default')
+                print "ref_parameters==>>",get_dict(ref_parameters)
     nodes_to_links={}
     # dict to saves pywr links which are saved as Hydra nodes,
     # It will be used later to check the edges section
@@ -865,7 +986,6 @@ def import_net (filename, connector):
         #check node type and if it is a link it will be added to the links instaed of nodes list
         #to do applay the same for rivers
         if node.type=='link':
-            print "Link is dected within nodes ....", node.name
             if node.type not in links_types:
                 links_types[node.type] = [node.name]
             else:
@@ -873,7 +993,6 @@ def import_net (filename, connector):
             network.links.append(node)
             nodes_to_links[node.name]=node
         else:
-            print "It is not link", node.name
             nodes_ids[node_['name']] = node.id
             if node.type in nodes_types.keys():
                 nodes_types[node.type].append(node.name)
@@ -931,7 +1050,6 @@ def import_net (filename, connector):
     set_resource_types(nodes_types, links_types, network.type, NetworkSummary, connector)
     return NetworkSummary
 
-
 '''
     This function has be token from ImportCSV.py and has been modified to work with the app
     It is used to upload the template to the server and set types to nodes and links
@@ -945,24 +1063,26 @@ def set_resource_types(nodes_types, links_types, networktype, NetworkSummary, co
     template = connection.call('upload_template_xml', {'template_xml':xml_template})
     type_ids = {}
     warnings = []
+    for tmpltype in template.get('types', []):
+        if tmpltype['name'].lower() == (str(networktype).lower()):
+            type_ids.update({tmpltype['name']: tmpltype['id']})
+            break
 
     for type_name in nodes_types:
         for tmpltype in template.get('types', []):
-            if tmpltype['name'] == type_name:
+            if tmpltype['name'] == (str(type_name).lower()):
                 type_ids.update({tmpltype['name']: tmpltype['id']})
                 break
 
     for type_name in links_types:
         for tmpltype in template.get('types', []):
-            if tmpltype['name'] == type_name:
+            if tmpltype['name'] == type_name.lower():
                 type_ids.update({tmpltype['name']: tmpltype['id']})
                 break
-
     for tmpltype in template.get('types', []):
-        if tmpltype['name'] == networktype:
+        if tmpltype['name'] == networktype.lower():
             type_ids.update({tmpltype['name']: tmpltype['id']})
             break
-
     args = []
 
     if networktype == '':
@@ -976,22 +1096,23 @@ def set_resource_types(nodes_types, links_types, networktype, NetworkSummary, co
     if NetworkSummary.get('nodes', []):
         for node in NetworkSummary['nodes']:
             for typename, node_name_list in nodes_types.items():
-                if typename in type_ids and node.name in node_name_list:
+                type_id=is_in_dict(typename, type_ids)
+                if type_id !=None  and node.name in node_name_list:
                     args.append(dict(
                         ref_key = 'NODE',
                         ref_id  = node.id,
-                        type_id = type_ids[typename],
+                        type_id = type_id,
                     ))
 
     if NetworkSummary.get('links', []):
         for link in NetworkSummary['links']:
             for typename, link_name_list in links_types.items():
-                if type_ids[typename] and link['name'] in link_name_list:
+                type_id = is_in_dict(typename, type_ids)
+                if type_id !=None and link['name'] in link_name_list:
                     args.append(dict(
                         ref_key = 'LINK',
                         ref_id  = link['id'],
-                        type_id = type_ids[typename],
+                        type_id = type_id ,
                     ))
-
 
     connection.call('assign_types_to_resources', {'resource_types':args})

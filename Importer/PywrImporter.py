@@ -37,12 +37,8 @@ Examples:
 python PywrImporter.py  -m "c:\temp\Example_3.json"
 '''
 
-
-
 from HydraLib.PluginLib import JSONPlugin
-
 from HydraLib import PluginLib
-
 from HydraLib.PluginLib import write_progress, write_output
 from PywrJsonReader import import_net
 import logging

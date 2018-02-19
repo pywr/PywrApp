@@ -3,7 +3,7 @@
 
 plugin_name: PywrAuto
 
-This app export the Hydranetwork into Pywr json file, runs he Pywr model and extract the model output and pushed them to the Hydra
+This app export the Hydranetwork into Pywr json file, runs he Pywr model and extractz the model output and pushes them to the Hydra
 
 **Args:**
 ====================== ======= ========== =========================================
@@ -36,7 +36,6 @@ Example:
 '''
 
 import os
-import time
 from datetime import datetime
 from dateutil import parser as prs
 from dateutil.relativedelta import relativedelta
@@ -48,6 +47,8 @@ from HydraLib.PluginLib import write_progress, write_output
 from Lib.data_files_reader import get_h5DF_store, get_node_attr_values
 from Exporter.PywrJsonWriter import pywrwriter
 from Exporter.PywrJsonWriter import get_resourcescenarios_ids
+from Lib.utilities import  check_output_file
+
 import json
 import logging
 import argparse as ap
@@ -81,6 +82,8 @@ def commandline_parser():
 
     parser.add_argument('-p', '--python3-path',
                         help='''path to python 3''')
+
+
     return parser
 
 def check_args(args):
@@ -93,6 +96,7 @@ def check_args(args):
         raise HydraPluginError('No network is specified')
     try:
         int(args.scenario_id)
+
     except (TypeError, ValueError):
         raise HydraPluginError('No senario is specified')
 
@@ -146,34 +150,6 @@ class resource_varaiable(object):
                 self.values[(time_axis[i])]=float(value[i])
 
 
-class PywrExporter(JSONPlugin):
-    def __init__(self, args):
-        self.connect(args)
-        self.network_id = int(args.network_id)
-        self.scenario_id = int(args.scenario_id)
-        self.template_id = int(args.template_id) if args.template_id is not None else None
-        self.net = self.connection.call('get_network', {'network_id': self.network_id,
-                                                   'include_data': 'Y',
-                                                   'template_id': self.template_id,
-                                                   'scenario_ids': [self.scenario_id]})
-        self.attrlist = self.connection.call('get_all_attributes', {})
-
-def check_output_file(results_file, start_time):
-    if os.path.isfile(results_file) == False:
-        raise HydraPluginError('No Output file is found ('+results_file+')')
-    dt = prs.parse(time.ctime(os.path.getmtime(results_file)))
-
-    delta = (dt - start_time).total_seconds()
-    if delta >= 0:
-        pass
-    else:
-        raise HydraPluginError('No updated Output file is found')
-
-def run_pywr_model(file_name, python3_path):
-    cmd=os.path.join(python3_path, "python")
-    proc = subprocess.Popen([cmd, 'PywrRunner.py', file_name])
-    proc.wait()
-
 def import_results(results_file, network, nodes_vars):
     csvfile=None
     varaiables_records=[]
@@ -206,16 +182,12 @@ def import_results(results_file, network, nodes_vars):
                 csvfile=res
                 get_csvrecorder_varaiables(csvfile, varaiables_records, start_date, end_date, timeStep, nodes_vars)
                 continue
-
             elif rec_type =="tablesrecorder":
                 h5file = res
                 get_tablesrecorder_varaiables(h5file, varaiables_records, network,  start_date, end_date, timeStep, nodes_vars)
                 continue
-            print "=====>>>", rec_name
-            var = resource_varaiable(nodes_vars[rec_name], res, value, start_date, end_date, timeStep)
-
+            var = resource_varaiable(nodes_vars[res], res, value, start_date, end_date, timeStep)
             varaiables_records.append(var)
-
     return varaiables_records
 
 
@@ -280,20 +252,39 @@ def import_vars(network, varaiables_records, attrlist):
                             res_scenario.append(res_scen)
         network.scenarios[0].resourcescenarios = res_scenario
 
-def save(network, connection):
-    connection.call('update_scenario', {'scen': network.scenarios[0]})
+def save(scenario, connection):
+    connection.call('update_scenario', {'scen': scenario})
 
 def get_nodes_variables(network):
-    nodes_vars_types = {'output': 'received_water', 'storage': 'storage', 'link': 'flow', 'river': 'flow','reservoir':'storage', 'Input': 'mean_flow'}
+    nodes_vars_types = {'output': 'received_water', 'storage': 'storage', 'link': 'flow', 'river': 'flow','reservoir':'storage', 'input': 'mean_flow','catchment':'seasonal_fdc'}
     nodes_vars={}
     for node in network.nodes:
         if node.types==None or len(node.types)==0:
             continue
-        type_=node.types[0]['name']
-        if type_=='catchment' or type_=='AggregatedNode':
+        type_=(node.types[0]['name']).lower()
+        if type_=='aggregatedaode':
             continue
         nodes_vars[node.name]=nodes_vars_types[type_]
     return nodes_vars
+
+
+def run_pywr_model(file_name, python3_path, args=None):
+    cmd=os.path.join(python3_path, "python")
+    proc = subprocess.Popen([cmd, 'PywrRunner.py', file_name])
+    proc.wait()
+
+class PywrExporter(JSONPlugin):
+    def __init__(self, args):
+        self.connect(args)
+        self.network_id = int(args.network_id)
+        self.scenario_id = int(args.scenario_id)
+        self.template_id = int(args.template_id) if args.template_id is not None else None
+        self.net = self.connection.call('get_network', {'network_id': self.network_id,
+                                                   'include_data': 'Y',
+                                                   'template_id': self.template_id,
+                                                   'scenario_ids': [self.scenario_id]})
+        self.attrlist = self.connection.call('get_all_attributes', {})
+
 
 if __name__ == '__main__':
     text ="Done"
@@ -324,7 +315,7 @@ if __name__ == '__main__':
         write_progress(11, steps)
 
         import_vars(pywrexporter.net, varaiables_records, pywrexporter.attrlist)
-        save(pywrexporter.net, pywrexporter.connection)
+        save(pywrexporter.net.scenarios[0], pywrexporter.connection)
         text = PluginLib.create_xml_response('Pywr Auto', (args.network_id), [args.scenario_id],
                                              message="Model run was successful.",
                                              errors=errors)

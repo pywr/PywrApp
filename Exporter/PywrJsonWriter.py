@@ -1,4 +1,5 @@
 import json
+from dateutil import parser
 import os
 
 from HydraLib.PluginLib import write_progress
@@ -191,6 +192,12 @@ class Node(dict):
                             continue
                         if key == 'timesteps':
                             dic[key] = int(metadata[key])
+                        elif key == 'percentiles'or key == 'months' or key =='coefficients':
+                            dic[key] = json.loads(metadata[key])
+                        elif key== 'epsilon':
+                            dic[key] = float(metadata[key])
+                        elif key== 'is_constraint':
+                            dic[key]=bool(metadata[key])
                         else:
                             dic[key] = metadata[key]
                 continue
@@ -214,10 +221,26 @@ class Node(dict):
                     vals={}
                     vals['type']='constant'
                     vals['value']=float(res.value.value)
-                    single_parameters[attr.name] =vals#float(res.value.value)
+                    #adding additional value related data from hydra metadat
+                    is_ref=False
+                    for key in metadata:
+                        if key != 'type' and key != 'user_id' and key != 'single'and key!='value':
+                            if key=='is_variable':
+                                vals[key] = bool(metadata[key])
+                            elif key=='upper_bounds' or key =='lower_bounds':
+                                vals[key]=float(metadata[key])
+                            elif key=='ref_name':
+                                is_ref=True
+                                ref_name=metadata[key]
+                            else:
+                                vals[key] = metadata[key]
+                    if is_ref==False:
+                        single_parameters[attr.name] =vals#float(res.value.value)
+                    else:
+                        single_parameters[attr.name] = ref_name
+                        parameters[ref_name]=vals
                 else:
                     single_parameters[attr.name] = float(res.value.value)
-
             elif res.value.type == 'timeseries' and metadata['single']== 'yes':
                 if 'column' in metadata.keys():
                     single_parameters[attr.name] = get_timesreies_values(res.value.value, metadata['column'],
@@ -229,8 +252,10 @@ class Node(dict):
             elif res.value.type == 'array' and metadata['single'] == 'yes':
                 if 'type' in metadata.keys() and metadata['type']=='tablesarray':
                     single_parameters[attr.name] = get_tables_array_values(res.value.value, metadata)
-
-
+                elif 'type' in metadata.keys() and metadata['type']=='constantscenario':
+                    single_parameters[attr.name] = get_constantscenario_values(res.value.value, metadata)
+                elif 'type' in metadata.keys() and metadata['type'] == 'annualharmonicseries':
+                    single_parameters[attr.name] = get_annualharmonicseries_values(res.value.value, metadata)
                 elif res.value.type == 'array' and metadata['single'] == 'yes':
                     single_parameters[attr.name] =json.loads (res.value.value)
 
@@ -245,28 +270,20 @@ class Node(dict):
             metadata = json.loads(res.value.metadata)
             if(metadata['type']=='controlcurveindex'):
                 complex_attributes[attr.name] =Controlcurveindex(attr, res, metadata, single_parameters)
-
             elif (metadata['type']=='indexedarray'):
                 complex_attributes[attr.name] =Indexedarray(attr, res, metadata, single_parameters)
-
             elif (metadata['type'] == 'aggregated'):
                 complex_attributes[attr.name] =Aggregated(attr, res, metadata, single_parameters)
-
             elif (metadata['type'] == 'ControlCurveInterpolated'):
                 complex_attributes[attr.name] =ControlCurveInterpolated(attr, res, metadata, single_parameters)
-
             elif (metadata['type'] == 'monthlyprofilecontrolcurve'):
                 complex_attributes[attr.name] =Monthlyprofilecontrolcurve(attr, res, metadata, single_parameters)
-
             elif (metadata['type'] == 'recorderthreshold'):
                 complex_attributes[attr.name] = Recorderthreshold(attr, res, metadata, single_parameters)
-
         adjuest_parameters(complex_attributes)
-
         for item in complex_attributes.keys():
             self.__dict__[attr.name] =complex_attributes[item]
             attributes[attr.name] = self.__dict__[attr.name]
-
         for item in single_parameters.keys():
             self.__dict__[item] = single_parameters[item]
             attributes[item] = self.__dict__[item]
@@ -288,6 +305,34 @@ def get_tables_array_values(value, metadata):
     values['url'] = value
     return values
 
+def get_constantscenario_values (value, metadata):
+    values={}
+    for key in metadata.keys():
+        if key =='user_id' or key =='single':
+            continue
+        values[key]=metadata[key]
+    values['values'] = json.loads(value)
+    return values
+
+def get_annualharmonicseries_values(value, metadata):
+    value=json.loads(value)
+    values = {}
+    values['type']=metadata['type']
+    values['mean'] = value['mean']
+    values['amplitudes'] = value['amplitudes']
+    values['phases'] = value['phases']
+    return values
+
+def get_scenarios(network, attributes_ids, resourcescenarios_ids):
+    scenarios=[]
+    for attr_ in network.attributes:
+        attr = attributes_ids[attr_.attr_id]
+        res = resourcescenarios_ids[attr_.id]
+        metadata=json.loads(res.value.metadata)
+        if "type" in metadata and metadata['type']=='scenario':
+            metadata['size']
+            scenarios.append({'name':attr.name, 'size':int(metadata['size'])})
+    return scenarios
 def get_timesreies_values(value, column, metadata):
     '''
     :param value: Json string which represnt the values
@@ -301,42 +346,81 @@ def get_timesreies_values(value, column, metadata):
         type_ = 'default'
     values={}
     vv = json.loads(value)
+    header=[]
     contents=[]
-    if(type_ == 'dailyprofile'):
-        contents.append('Index,' + column + '\n')
+    header = []
+
+    contents = []
+    if (type_ == 'dailyprofile'):
+        header.append('Index')
     elif (type_ == 'dataframe'):
-        contents.append('Timestamp,' + 'Data' + '\n')
+        header.append('Timestamp')
     else:
-        contents.append('Date,'+column+'\n')
-    day=1
-    import datetime
-    from dateutil import parser
-    print "LOW: ", vv.keys().sort()
-    for key in vv.keys():
-        dated_dict={}
-        for ts in (vv[key].keys()):
-            dated_dict[parser.parse(ts)]=ts
+        header.append('Date')
+    day = 1
 
-        ll=sorted(dated_dict.keys())
+    if 'checksum' in metadata.keys():
+        pass  # values['checksum']=metadata['checksum']
 
-        for date_ in ll:
-            date=dated_dict[date_]
-            print "Date: ", (date_), date
-            if(date.startswith('9999') ):
-                if(type_ == "monthlyprofile"):
-                    values['type'] = type_
-                    values['values'] = get_array_values(vv[key])
-                    return values
-                elif type_ == "dailyprofile":
-                    contents.append(str(day) + ',' + str(vv[key][date]) + '\n')
-                    day+=1
-            else:
-                contents.append(date+','+str(vv[key][date])+'\n')
-    # in case of  dailyprofile, hydra save only 365 dats in a year while
-    # pywr required values for 356 days, so days 365 is repeated till fix that in hydar
-    # this should be modified shortly and uses the Hydra hashtable attribute type
-    if(type_ == "dailyprofile"):
-        contents.append(str(day) + ',' + str(vv[key][date]))
+    if 'scenario' in metadata.keys():
+        values['scenario'] = metadata['scenario']
+        all_scenarios_data={}
+        int_keys={}
+        for item in vv['0'].keys():
+            int_keys[int(item)]=item
+        for sec_ in sorted(int_keys.keys()):
+            #if (type_ == 'dataframe'):
+            header.append(int_keys[sec_])
+            vv_=vv['0'][int_keys[sec_]]
+            dated_dict = {}
+            for ts in (vv_.keys()):
+                dated_dict[parser.parse(ts)] = ts
+            ll = sorted(dated_dict.keys())
+            for date_ in ll:
+                if date_ in all_scenarios_data:
+                    scenarios_date_data=all_scenarios_data[date_]
+                else:
+                    scenarios_date_data=[]
+                    all_scenarios_data[date_]=scenarios_date_data
+                scenarios_date_data.append(vv_[dated_dict[date_]])
+        contents=','.join(header)
+        for date in sorted(all_scenarios_data.keys()):
+            contents+='\n'+str(date)+','+','.join(all_scenarios_data[date])
+    else:
+        if (type_ == 'dataframe'):
+            contents.append(header[0]+',Data' + '\n')
+        else:
+            contents.append(header[0] +','+column + '\n')
+        for key in vv.keys():
+            import operator
+            print "SSS", vv[key].keys()
+           #ss=vv[key].keys().sort(key=operator.itemgetter('date'))
+
+            dated_dict={}
+            for ts in (vv[key].keys()):
+                print "TS:",(ts)
+                dated_dict[parser.parse(ts)]=ts
+            ll=(dated_dict.keys())
+            ll.sort(key = lambda d: (d.year, d.month, d.day))
+            print ll
+            for date_ in ll:
+                line=''
+                date=dated_dict[date_]
+                if(date.startswith('9999') ):
+                    if(type_ == "monthlyprofile"):
+                        values['type'] = type_
+                        values['values'] = get_array_values(vv[key])
+                        return values
+                    elif type_ == "dailyprofile":
+                        contents.append(str(day) + ',' + str(vv[key][date]) + '\n')
+                        day+=1
+                else:
+                    contents.append(date+','+str(vv[key][date])+'\n')
+        # in case of  dailyprofile, hydra save only 365 days in a year while
+        # pywr required values for 356 days, so days 365 is repeated till fix that in hydar
+        # this should be modified shortly and uses the Hydra hashtable attribute type
+        if(type_ == "dailyprofile"):
+            contents.append(str(day) + ',' + str(vv[key][date]))
     if ('parse_dates' in metadata.keys()):
         if(metadata['parse_dates'].lower() == 'true'):
             values['parse_dates'] = True
@@ -347,12 +431,18 @@ def get_timesreies_values(value, column, metadata):
         values['index_col'] = int(metadata['index_col'])
 
     if ('dayfirst' in metadata.keys()):
-        values['dayfirst'] = metadata['dayfirst']
+        values['dayfirst'] = bool(metadata['dayfirst'])
+
 
     values['type'] = type_
     values['url']=contents
     if(type_!='dataframe'):
         values['column']=column
+    else:
+        if 'dayfirst' not in values:
+            values['dayfirst']=True
+        if 'parse_dates' not in values:
+            values['parse_dates']=True
 
     return values
 
@@ -399,6 +489,7 @@ class Edge(object):
             ss.attrs.append(slot_from)
             ss.attrs.append(slot_to)
         return ss
+
 class Recorder(object):
     def __init__(self, value):
         if(len(value)==2):
@@ -426,15 +517,23 @@ def get_recotds(network, attributes_ids, resourcescenarios_ids):
     for attr_ in network.attributes:
         attr = attributes_ids[attr_.attr_id]
         res = resourcescenarios_ids[attr_.id]
-        if (attr.name == 'recorder'):
+        metadata = json.loads(res.value.metadata)
+        if 'is_recorder' in metadata and bool(metadata['is_recorder'])==True:
+        #if (attr.name == 'recorder'):
             value=res.value.value
             metadata = json.loads(res.value.metadata)
             dic={}
             recorders[value]=dic
             for key in metadata.keys():
-                if(key!="user_id"):
-                  dic[key]=metadata[key]
+                if(key!="user_id" and key!="is_recorder"):
+                    if key=='epsilon':
+                        dic[key] = float(metadata[key])
+                    elif key =='coefficients':
+                        dic[key] = json.loads(metadata[key])
+                    else:
+                        dic[key]=metadata[key]
             has_tablerecorder=True
+
 
 class Domain(object):
     def __init__(self, name, color):
@@ -491,7 +590,7 @@ class PywrNetwork (object):
         It is objects with their attaributes
         It will be converted to Json string using json.dumps method latter
     '''
-    def __init__(self, metadata, timestepper, solver, nodes, edges, domains, parameters,  recorders):
+    def __init__(self, metadata, timestepper, solver, nodes, edges, domains, parameters,  recorders, scenarios):
         self.metadata=metadata
         self.timestepper=timestepper
         self.solver=solver
@@ -500,6 +599,7 @@ class PywrNetwork (object):
         self.domains=domains
         self.parameters=parameters
         self.recorders=recorders
+        self.scenarios=scenarios
 
     def get_json(self):
         '''
@@ -508,6 +608,9 @@ class PywrNetwork (object):
         json_string='{\n\"metadata\": '+json.dumps(get_dict(self.metadata), indent=4)+',\n'
         if len(get_dict(self.timestepper)) > 0:
             json_string=json_string+'\"timestepper\": '+json.dumps(get_dict(self.timestepper), indent=4)+',\n'
+        if len(self.scenarios)>0:
+            json_string +='\"scenarios\" :'+ json.dumps(self.scenarios, indent=4)+',\n'
+
         json_string = json_string + '\"nodes\": '+json.dumps(get_dict(self.nodes), indent=4)+',\n'
         json_string = json_string + '\"edges\": ' + json.dumps(get_dict(self.edges), indent=4) + ',\n'
         if(len(self.domains)>0):
@@ -583,6 +686,7 @@ def pywrwriter(network, attrlist, output_file, steps):
     timestepper=Timestepper(network, attributes_ids, resourcescenarios_ids)
     metadata = Metadata(network, resourcescenarios_ids, attributes_ids)
     get_recotds(network, attributes_ids, resourcescenarios_ids)
+    scenarios=get_scenarios(network, attributes_ids, resourcescenarios_ids)
     for attr_ in network.attributes:
         attr = attributes_ids[attr_.attr_id]
         res = resourcescenarios_ids[attr_.id]
@@ -598,13 +702,12 @@ def pywrwriter(network, attrlist, output_file, steps):
         node=Node(node_, attributes_ids, resourcescenarios_ids)
         nodes_id_name[node_.id]=node_.name
         nodes.append(node)
-    #need to be done check parameters refs for the new pywr format
+    #To do check parameters refs for the new pywr format
     parameters=get_parameters_refs(nodes)
     to_be_added_to_nodes=[]
-
     for link_ in network.links:
         #test if the link type is link or river, if so it will be added to the pywr nodes
-        if link_.types[0].name =='link' or link_.types[0].name=='river':
+        if link_.types[0].name.lower() =='link':# or link_.types[0].name=='river':
             node = Node(link_, attributes_ids, resourcescenarios_ids)
             nodes_id_name[node_.id] = node_.name
             nodes.append(node)
@@ -623,11 +726,19 @@ def pywrwriter(network, attrlist, output_file, steps):
             if (k.lower() != 'name' and k.lower() != 'type' and k.lower() != 'position'):
                 value=node.__dict__.values()[i]
                 if type(value) is dict:
-                    if value['type'] == 'arrayindexed' or value['type'] == 'dailyprofile' or value['type'] == 'dataframe':
-                        file_name=node.name+"_"+k+'.csv'
-                        write_time_series_to_file(value['url'], os.path.join(json_file__folder, file_name))
-                        value['url']=file_name
-
+                    try:
+                        if value['type'] == 'arrayindexed' or value['type'] == 'dailyprofile' or value['type'] == 'dataframe':
+                            file_name=node.name+"_"+k+'.csv'
+                            write_time_series_to_file(value['url'], os.path.join(json_file__folder, file_name))
+                            value['url']=file_name
+                        else:
+                            if value['type'] == 'tablesarray':
+                                file_name = node.name + "_" + k + '.h5'
+                                write_tablesarray_to_hdf(os.path.join(json_file__folder, file_name), value['where'],
+                                                         value['node'], json.loads(value['url']))
+                                value['url'] = file_name
+                    except:
+                        pass
     for k in parameters:
         value=parameters[k]
         if type(value) is dict and 'type' in value.keys():
@@ -638,15 +749,17 @@ def pywrwriter(network, attrlist, output_file, steps):
             else:
                 if value['type'] == 'tablesarray':
                      file_name=node.name+"_"+k+'.h5'
-                     write_tablesarray_to_hdf(os.path.join(json_file__folder, file_name), value['where'], value['node'], value['url'])
+                     write_tablesarray_to_hdf(os.path.join(json_file__folder, file_name), value['where'], value['node'], json.loads(value['url']))
                      value['url'] = file_name
     write_progress(5, steps)
 
-    pywrNetwork=PywrNetwork(metadata, timestepper, solver, nodes, edges, domains, parameters,  recorders)
+    pywrNetwork=PywrNetwork(metadata, timestepper, solver, nodes, edges, domains, parameters,  recorders, scenarios)
     write_progress(6, steps)
+    pywr_json_string=pywrNetwork.get_json()
     with open(output_file, "w") as text_file:
-        text_file.write(pywrNetwork.get_json())
+        text_file.write(pywr_json_string)
         #text_file.write(json.dumps(get_dict(pywrNetwork), indent=4))
+    return pywr_json_string
 
 
 
