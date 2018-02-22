@@ -32,17 +32,36 @@ def test_recorders(pywr_mode, hydra_model):
             "record attribute was not added!"
             assert pywr_recorders[key][key_]==hydra_recorders[key][key_]
 
+def test_general_paremeters(pywr_mode, hydra_model):
+    pass
+
+def test_nodes(pywr_mode, hydra_model):
+    pass
+
+def test_edges(pywr_mode, hydra_model):
+    pass
+
+def test_solver(pywr_mode, hydra_model):
+    pass
+
+def test_domain(pywr_mode, hydra_model):
+    pass
+
+
 class Pywr_to_hydra_importer(unittest.TestCase):
 
     def test_models(self):
-        filename = r"F:\work\Apps\pywr\tests\models\demand_saving2_with_variables.json"
+        filename = r"demand_saving2_with_variables.json"
         pywr_mode, json_list = get_pywr_json_from_file(filename)
         connector = HydraConnector()
         hydra_network, nodes_types, links_types = import_net(filename, connector.connection)
         hydra_model = get_dict(hydra_network)
         test_recorders(pywr_mode, hydra_model)
-
-
+        test_general_paremeters(pywr_mode, hydra_model)
+        test_nodes(pywr_mode, hydra_model)
+        test_edges(pywr_mode, hydra_model)
+        test_solver(pywr_mode, hydra_model)
+        test_domain(pywr_mode, hydra_model)
 
 
 def main():
