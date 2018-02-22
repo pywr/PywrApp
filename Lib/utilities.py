@@ -4,7 +4,6 @@ import time
 from HydraLib.PluginLib import HydraPluginError
 from dateutil import parser as prs
 
-
 def get_dict(obj):
     '''
     It returns a dict which represent an object

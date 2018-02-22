@@ -83,7 +83,7 @@ class Node(object):
 
         for recorder in recorders:
             dict=get_dict(recorder)
-            print "dict===>>", dict
+            #print "dict===>>", dict
             if('node' in dict.keys()):
                 del dict["node"]
             del dict['name']
@@ -172,7 +172,7 @@ class Network (object):
         :param timestepper: pywr timestepper
         :param metadata: pywr metadata
         '''
-        print "recorders:=>>", get_dict(recorders)
+        #print "recorders:=>>", get_dict(recorders)
         global has_tablerecorder
         global scenarios
         attributes_={}
@@ -261,8 +261,8 @@ class Network (object):
                 #set metadata value as a string, otherwise, the server will throws
                 #StatementError, type error
                 metadata[key] = str(scenarios[scenario][key])
-            print "global scenarios", scenario, scenarios[scenario]
-            print metadata
+            #print "global scenarios", scenario, scenarios[scenario]
+            #print metadata
             counter.id = counter.id - 1
             attributes_[name] = AttributeData("descriptor", name, '-', 'Dimensionless', metadata)
             #type, value, unit, dimen,
@@ -271,9 +271,9 @@ class Network (object):
                 RecourseAttribute('NETWORK', counter.id, name, attributes_[name], 'Dimensionless'))
 
         for recorder in recorders:
-            print "1. from network ===>>>", get_dict(recorder)
+            #print "1. from network ===>>>", get_dict(recorder)
             if (recorder.name.lower().strip()=="database" or recorder.type=='CSVRecorder') or recorder.type=='polynomial1dcost' and not hasattr(recorder, "node"):
-                print "2. from network ===>>>", get_dict(recorder)
+                #print "2. from network ===>>>", get_dict(recorder)
                 dic=get_dict(recorder)
                 metadata={}
                 for key in dic:
@@ -369,7 +369,7 @@ class Recorder(object):
             self.epsilon=record_['epsilon']
         if'parameter' in record_.keys():
             self.parameter=record_['parameter']
-        print "results", get_dict(self)
+        #print "results", get_dict(self)
 
 class Domain (object):
     def __init__(self, domain_):
@@ -486,7 +486,7 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
         elif isinstance(value_, basestring):
             attr=is_in_dict(value_, ref_parameters)
             if attr != None:
-                print "FOUND IT", value_
+                #print "FOUND IT", value_
                 attr_type = attr.type
                 value = attr.value
                 metadata=json.loads(attr.metadata)
@@ -538,7 +538,7 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
                     attr_type = 'array'
                     if len(scenarios) > 0 and 'scenario' in value_:
                         if 'scenario' in value_.keys():
-                            #Will chanmg ethe tyoe to dataframe when export the json from hydra
+                            #Will change the tyoe to dataframe when export the json from hydra
                             #with scenario needs to be changed
                             metadata["scenario"] = value_['scenario']
 
@@ -618,13 +618,13 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
 def add_metdata(value_, metadata):
     for key in value_:
         if is_in_dict(key, metadata) ==None:
-            print value_[key]
+            #print value_[key]
             metadata[key]=str(value_[key])
 
 '''
-The flowing functions are used to get specific pywr parameters in a hydra resource attributes
-functions names indicates the pywr parameter  
-Metadata is used to define description of the attributes which are used by pywr
+    The flowing functions are used to get specific pywr parameters in a hydra resource attributes
+    functions names indicates the pywr parameter  
+    Metadata is used to define description of the attributes which are used by pywr
 '''
 def get_aggregated_attribute(value_, name, counter, attributes_, _type, res_attributes=None):
     metadata={}
@@ -844,6 +844,47 @@ def adjust_links_nodes(nodes_to_links, not_added_links, nodes_ids):
             elif edge_[1]==node_name:
                 nodes_to_links[node_name].node_1_id= nodes_ids[edge_[0]]
 
+def get_pywr_json_from_file(filename):
+    json_list = []
+    f = open(filename, 'r')
+    json_string = ""
+    while 1:
+        line = f.readline()
+        if not line: break
+        json_string += line
+    f.close()
+    main_json = json.loads(json_string)  # , object_hook=lambda d: namedtuple('X', d.keys(), rename=False, verbose=False)(*d.values()))
+    json_list.append(main_json)
+    if "includes" in main_json:
+        for included_file in main_json['ncludes']:
+            ss = os.path.dirname(included_file)
+            if (ss == ''):
+                included_file = os.path.join(json_file__folder[0], included_file)
+            included_f = open(included_file, 'r')
+            included_json_string = ""
+            while 1:
+                line = included_f.readline()
+                if not line: break
+                included_json_string += line
+            included_f.close()
+
+            included_x = json.loads(included_json_string, object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
+            json_list.append(included_x)
+
+            if ("nodes" in included_x):
+                for node in included_x['nodes']:
+                    main_json.nodes.append(node)
+
+            if "edges" in included_x:
+                for edge in included_x['edges']:
+                    main_json.edges.append(edge)
+            # if hasattr(included_x, "parameters"):
+            #    for key_ in included_x.parameters:
+            #        if hasattr(main_json, "parameters"):
+            #           main_json.parameters[key_]=included_x.parameters[key_]
+
+    return main_json, json_list
+
 def import_net (filename, connector):
     '''
     Main function which reads the pywr model JSON  string from a file
@@ -855,7 +896,6 @@ def import_net (filename, connector):
     It will return a Hydra network summary
     '''
     has_tablerecorder = False
-    json_list=[]
     # sometimes json string has include statment which include another file whcih contains the
     # another JSON string, if it is the case it will be added to json_list to added them to the model
     json_file__folder.append(os.path.dirname(filename))
@@ -872,44 +912,7 @@ def import_net (filename, connector):
     nodes_attributes={}
     links_attributes = {}
     network_attributes={}
-    f = open(filename,'r')
-    json_string = ""
-    while 1:
-        line = f.readline()
-        if not line:break
-        json_string += line
-    f.close()
-    #test_for_invalid_keys_names(json_string)
-    main_json = json.loads(json_string)#, object_hook=lambda d: namedtuple('X', d.keys(), rename=False, verbose=False)(*d.values()))
-    json_list.append(main_json)
-    if "includes" in main_json:
-            for included_file in main_json['ncludes']:
-                ss = os.path.dirname(included_file )
-                if (ss == ''):
-                    included_file = os.path.join(json_file__folder[0], included_file)
-                included_f = open(included_file, 'r')
-                included_json_string = ""
-                while 1:
-                    line = included_f.readline()
-                    if not line: break
-                    included_json_string += line
-                included_f.close()
-
-                included_x = json.loads(included_json_string , object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
-                json_list.append(included_x)
-
-                if ("nodes" in included_x):
-                    for node in included_x['nodes']:
-                        main_json.nodes.append(node)
-
-                if "edges" in included_x:
-                    for edge in included_x['edges']:
-                        main_json.edges.append(edge)
-                #if hasattr(included_x, "parameters"):
-                #    for key_ in included_x.parameters:
-                #        if hasattr(main_json, "parameters"):
-                #           main_json.parameters[key_]=included_x.parameters[key_]
-
+    main_json, json_list=get_pywr_json_from_file(filename)
     global timeseries
     if "timestepper" in main_json:
         timeseries=get_timeseriesdates(main_json['timestepper'])
@@ -968,7 +971,7 @@ def import_net (filename, connector):
                 k = json_['parameters'].keys()[i]
                 counter.id = counter.id - 1
                 get_attribute_type_and_value(json_['parameters'].values()[i], k, counter, ref_parameters, 'default')
-                print "ref_parameters==>>",get_dict(ref_parameters)
+                #print "ref_parameters==>>",get_dict(ref_parameters)
     nodes_to_links={}
     # dict to saves pywr links which are saved as Hydra nodes,
     # It will be used later to check the edges section
@@ -985,6 +988,7 @@ def import_net (filename, connector):
         node = Node(node_, counter, nodes_attributes, node_records, nodes_vars_types)
         #check node type and if it is a link it will be added to the links instaed of nodes list
         #to do applay the same for rivers
+        '''
         if node.type=='link':
             if node.type not in links_types:
                 links_types[node.type] = [node.name]
@@ -992,14 +996,15 @@ def import_net (filename, connector):
                 links_types[node.type].append(node.name)
             network.links.append(node)
             nodes_to_links[node.name]=node
+       
         else:
-            nodes_ids[node_['name']] = node.id
-            if node.type in nodes_types.keys():
-                nodes_types[node.type].append(node.name)
-            else:
-                nodes_types[node.type] = [node.name]
-            network.nodes.append(node)
-
+         '''
+        nodes_ids[node_['name']] = node.id
+        if node.type in nodes_types.keys():
+            nodes_types[node.type].append(node.name)
+        else:
+            nodes_types[node.type] = [node.name]
+        network.nodes.append(node)
         counter.id = counter.id - 1
         for attr_name in nodes_attributes[node.name].keys():
             if( attr_name in project_attributes):
@@ -1033,7 +1038,7 @@ def import_net (filename, connector):
         try:
             rs.attr_id=attrs_names_ids[rs.attr_id]
         except:
-            print "Not found-------------->", rs.attr_id
+            pass#print "Not found-------------->", rs.attr_id
     network.scenarios[0].resourcescenarios=recourseAttributea
 
     for rs in network.attributes:
@@ -1045,19 +1050,23 @@ def import_net (filename, connector):
         for rs in link.attributes:
             rs.attr_id = attrs_names_ids[rs.attr_id]
     #Push the network to Hydra
-    NetworkSummary = connector.call('add_network', {'net': get_dict(network)})
-    #Push pywr template to Hydra and set nodes and links types
-    set_resource_types(nodes_types, links_types, network.type, NetworkSummary, connector)
-    return NetworkSummary
+
+    return network,nodes_types, links_types
 
 '''
     This function has be token from ImportCSV.py and has been modified to work with the app
     It is used to upload the template to the server and set types to nodes and links
 '''
+def add_network(network, connector,nodes_types, links_types):
+    NetworkSummary = connector.call('add_network', {'net': get_dict(network)})
+    # Push pywr template to Hydra and set nodes and links types
+    set_resource_types(nodes_types, links_types, network.type, NetworkSummary, connector)
+    return NetworkSummary
+
 
 def set_resource_types(nodes_types, links_types, networktype, NetworkSummary, connection):
     template_file='..\PywrNetwork.xml'
-    print("Setting resource types based on %s." % template_file)
+    #print("Setting resource types based on %s." % template_file)
     with open(template_file) as f:
         xml_template = f.read()
     template = connection.call('upload_template_xml', {'template_xml':xml_template})

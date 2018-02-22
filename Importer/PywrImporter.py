@@ -40,7 +40,7 @@ python PywrImporter.py  -m "c:\temp\Example_3.json"
 from HydraLib.PluginLib import JSONPlugin
 from HydraLib import PluginLib
 from HydraLib.PluginLib import write_progress, write_output
-from PywrJsonReader import import_net
+from PywrJsonReader import import_net, add_network
 import logging
 import argparse as ap
 
@@ -88,8 +88,8 @@ if __name__ == '__main__':
     connector=HydraConnector(args)
     write_progress(4, steps)
 
-
-    network=import_net(args.json_file, connector.connection)
+    hydra_network, nodes_types, links_types=import_net(args.json_file, connector.connection)
+    network =add_network(hydra_network, connector.connection,nodes_types, links_types)
     write_progress(5, steps)
 
     text = PluginLib.create_xml_response('Pywr importer', (network.id), [network.scenarios[0].id],
