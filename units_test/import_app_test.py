@@ -1,4 +1,5 @@
 import unittest
+from collections import namedtuple
 import json
 from Lib.utilities import get_dict, is_in_dict
 from Exporter.PywrJsonWriter import get_recotds
@@ -19,10 +20,18 @@ def test_domain(pywr_mode, hydra_model):
 
 class Pywr_to_hydra_importer(unittest.TestCase):
     def setUp(self):
+        attributes_json_file="attributes.json"
+        f = open(attributes_json_file, 'r')
+        attributes_json_string=''
+        while 1:
+            line = f.readline()
+            if not line: break
+            attributes_json_string += line
+        f.close()
+        hydra_attributes = json.loads(attributes_json_string, object_hook=lambda d: namedtuple('X', d.keys(), rename=False, verbose=False)(*d.values()))
         filename = r"demand_saving2_with_variables.json"
         self.pywr_model, json_list = get_pywr_json_from_file(filename)
-        connector = HydraConnector()
-        hydra_network, nodes_types, links_types = import_net(filename, connector.connection)
+        hydra_network, nodes_types, links_types = import_net(filename, hydra_attributes)
         self.hydra_model = get_dict(hydra_network)
 
     def test_recorders(self):

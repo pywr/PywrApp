@@ -86,9 +86,10 @@ if __name__ == '__main__':
     write_progress(3, steps)
 
     connector=HydraConnector(args)
+    c_attrlist = connector.connection.call('get_all_attributes', {})
     write_progress(4, steps)
 
-    hydra_network, nodes_types, links_types=import_net(args.json_file, connector.connection)
+    hydra_network, nodes_types, links_types=import_net(args.json_file, c_attrlist, connector.connection)
     network =add_network(hydra_network, connector.connection,nodes_types, links_types)
     write_progress(5, steps)
 

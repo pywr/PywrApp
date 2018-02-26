@@ -31,6 +31,7 @@ class Project (object):
         self.name="Pywer exported project at "+str(datetime.now())
         self.status = 'A'
         self.description='Create by Pywr exporter'
+        self.id=-1
 
 
 class Value (object):
@@ -885,7 +886,7 @@ def get_pywr_json_from_file(filename):
 
     return main_json, json_list
 
-def import_net (filename, connector):
+def import_net (filename, c_attrlist, connector=None):
     '''
     Main function which reads the pywr model JSON  string from a file
     It will extracts the main network elements from it and set them in a form which is recognized by Hydra
@@ -908,7 +909,7 @@ def import_net (filename, connector):
     links_types={}
     # dict contains the main pywr variables according to the node type
     nodes_vars_types = {'output': 'received_water', 'storage': 'storage', 'link': 'flow', 'reservoir': 'storage', 'input':'mean_flow', 'catchment':'seasonal_fdc'}
-    c_attrlist = connector.call('get_all_attributes', {})
+
     nodes_attributes={}
     links_attributes = {}
     network_attributes={}
@@ -924,7 +925,7 @@ def import_net (filename, connector):
 
     project=Project()
     request=jsonpickle.dumps(project).replace("/","_").replace("\"", '\'')
-    Proj = connector.call('add_project', {'project': project.__dict__})
+
     if ("recorders" in main_json):
         rcds=get_dict(main_json['recorders'])
         for kk in rcds.keys():
@@ -947,10 +948,10 @@ def import_net (filename, connector):
         solver_name=main_json['solver']
 
     if ("metadata" in main_json):
-        network = Network('Pywr',solver_name, Proj.id, counter, domains, recorders, network_attributes,
+        network = Network('Pywr',solver_name, -1, counter, domains, recorders, network_attributes,
                           timestepper, main_json['metadata'])
     else:
-        network = Network('Pywr', solver_name, Proj.id, counter, domains, recorders, network_attributes,
+        network = Network('Pywr', solver_name, -1, counter, domains, recorders, network_attributes,
                           timestepper)
     #add new new network attributes to project attributes
     for attr_name in network_attributes[network.name].keys():
@@ -1030,7 +1031,10 @@ def import_net (filename, connector):
                project_attributes[attr_name] = attr
     adjust_links_nodes(nodes_to_links, not_added_links, nodes_ids)
     new_attr = get_new_attributes(project_attributes.values(), c_attrlist)
-    attributes = connector.call('add_attributes', {'attrs': new_attr})
+    if connector!=None:
+        attributes = connector.call('add_attributes', {'attrs': new_attr})
+    else:
+        attributes=c_attrlist
     attrs_names_ids={}
     for tt in attributes:
         attrs_names_ids[tt.name]=tt.id
@@ -1058,6 +1062,9 @@ def import_net (filename, connector):
     It is used to upload the template to the server and set types to nodes and links
 '''
 def add_network(network, connector,nodes_types, links_types):
+    project=Project()
+    proj = connector.call('add_project', {'project': project.__dict__})
+    network.project_id=proj.id
     NetworkSummary = connector.call('add_network', {'net': get_dict(network)})
     # Push pywr template to Hydra and set nodes and links types
     set_resource_types(nodes_types, links_types, network.type, NetworkSummary, connector)
