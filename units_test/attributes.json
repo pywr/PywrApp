@@ -1,0 +1,132 @@
+[   
+   {
+      "dimen":"dimensionless",
+      "description":"-",
+      "id":2,
+      "cr_date":"2018-02-23 11:41:26",
+      "name":"total_deficit"
+   },
+   {
+      "dimen":"dimensionless",
+      "description":"-",
+      "id":4,
+      "cr_date":"2018-02-23 11:41:26",
+      "name":"level1"
+   },
+   {
+      "dimen":"dimensionless",
+      "description":"-",
+      "id":6,
+      "cr_date":"2018-02-23 11:41:26",
+      "name":"cost"
+   },
+   {
+      "dimen":"dimensionless",
+      "description":"-",
+      "id":7,
+      "cr_date":"2018-02-23 11:41:26",
+      "name":"demand_saving_factor"
+   },
+   {
+      "dimen":"dimensionless",
+      "description":"-",
+      "id":8,
+      "cr_date":"2018-02-23 11:41:26",
+      "name":"demand_baseline"
+   },
+   {
+      "dimen":"dimensionless",
+      "description":"-",
+      "id":9,
+      "cr_date":"2018-02-23 11:41:26",
+      "name":"initial_volume"
+   },
+   {
+      "dimen":"dimensionless",
+      "description":"-",
+      "id":10,
+      "cr_date":"2018-02-23 11:41:26",
+      "name":"min_volume"
+   },
+   {
+      "dimen":"dimensionless",
+      "description":"-",
+      "id":15,
+      "cr_date":"2018-02-23 11:41:26",
+      "name":"demand_profile"
+   }, 
+   {
+      "dimen":"dimensionless",
+      "description":"-",
+      "id":18,
+      "cr_date":"2018-02-23 11:41:26",
+      "name":"max_flow"
+   },
+   {
+      "dimen":"dimensionless",
+      "description":"-",
+      "id":19,
+      "cr_date":"2018-02-23 11:41:26",
+      "name":"demand_saving_level"
+   },   
+   {
+      "dimen":"dimensionless",
+      "description":"-",
+      "id":21,
+      "cr_date":"2018-02-23 11:41:26",
+      "name":"max_volume"
+   },
+   {
+      "dimen":"dimensionless",
+      "description":"-",
+      "id":22,
+      "cr_date":"2018-02-23 11:41:26",
+      "name":"flow"
+   },
+   {
+      "dimen":"dimensionless",
+      "description":"-",
+      "id":23,
+      "cr_date":"2018-02-23 11:41:26",
+      "name":"level2"
+   },
+   {
+      "dimen":"dimensionless",
+      "description":"-",
+      "id":26,
+      "cr_date":"2018-02-23 11:41:26",
+      "name":"received_water"
+   },
+   {
+      "dimen":"dimensionless",
+      "description":"-",
+      "id":27,
+      "cr_date":"2018-02-23 11:41:26",
+      "name":"storage"
+   },
+   {
+      "dimen":"dimensionless",
+      "description":"-",
+      "id":28,
+      "cr_date":"2018-02-23 11:41:26",
+      "name":"mean_flow"
+   },
+   {
+      "dimen":"dimensionless",
+      "id":31,
+      "name":"min_flow",
+      "cr_date":"2018-02-23 11:41:27"
+   },
+   {
+      "dimen":"dimensionless",
+      "id":36,
+      "name":"max_storage",
+      "cr_date":"2018-02-23 11:41:27"
+   },
+   {
+      "dimen":"dimensionless",
+      "id":37,
+      "name":"min_storage",
+      "cr_date":"2018-02-23 11:41:27"
+   }
+]
