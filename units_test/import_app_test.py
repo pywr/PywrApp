@@ -14,7 +14,7 @@ def compare_hydra_section(excpected_section, imported_section):
     :param imported_section: the actual imported section
     :return:
     '''
-    assert len(imported_section) == len(excpected_section)
+#    assert len(imported_section) == len(excpected_section)
     for record in excpected_section:
         # firsttest is the recorder is added
         record_name = record['value']['name']
@@ -48,6 +48,10 @@ class Pywr_to_hydra_importer(unittest.TestCase):
         self.attributes_ids = {}
         for attr in hydra_attributes:
             self.attributes_ids[attr.id] = attr
+
+        self.nodes_id_name = {}
+        for node_ in hydra_network.nodes:
+            self.nodes_id_name[node_.id] = node_.name
 
     def test_recorders(self):
         '''
@@ -191,21 +195,141 @@ class Pywr_to_hydra_importer(unittest.TestCase):
                 }
             }
             ]
-        imported_recoparameters = get_pywr_section(self.hydra_model, self.attributes_ids, self.resourcescenarios_ids,
+        imported_parameters = get_pywr_section(self.hydra_model, self.attributes_ids, self.resourcescenarios_ids,
                                            'parameters')
-        compare_hydra_section(expected_parameters,imported_recoparameters)
+        compare_hydra_section(expected_parameters,imported_parameters)
 
     def test_nodes(self):
-        pass
+        '''
+        test imported nodes
+        '''
+        print "Test nodes ......"
+        no_nodes=4
+        expecte_nodes_attributes=[
+            {
+                "source": "NODE",
+                "resource_attr_id": -28,
+                "attr_id": 22,
+                "value": {
+                    "name": "flow",
+                    "value": "0.0",
+                    "hidden": "N",
+                    "type": "descriptor",
+                    "dimension": "Dimensionless",
+                    "unit": "-",
+                    "metadata": "{\"pywr_section\": \"nodes\"}"
+                }
+            },
+            {
+                "source": "NODE",
+                "resource_attr_id": -30,
+                "attr_id": 9,
+                "value": {
+                    "name": "initial_volume",
+                    "value": "1000",
+                    "hidden": "N",
+                    "type": "descriptor",
+                    "dimension": "Dimensionless",
+                    "unit": "-",
+                    "metadata": "{\"pywr_section\": \"nodes\"}"
+                }
+            },
+            {
+                "source": "NODE",
+                "resource_attr_id": -31,
+                "attr_id": 21,
+                "value": {
+                    "name": "max_volume",
+                    "value": "1000",
+                    "hidden": "N",
+                    "type": "descriptor",
+                    "dimension": "Dimensionless",
+                    "unit": "-",
+                    "metadata": "{\"pywr_section\": \"nodes\"}"
+                }
+            },
+            {
+                "source": "NODE",
+                "resource_attr_id": -33,
+                "attr_id": 6,
+                "value": {
+                    "name": "cost",
+                    "value": "10",
+                    "hidden": "N",
+                    "type": "descriptor",
+                    "dimension": "Dimensionless",
+                    "unit": "-",
+                    "metadata": "{\"pywr_section\": \"nodes\"}"
+                }
+            },
+            {
+                "source": "NODE",
+                "resource_attr_id": -35,
+                "attr_id": 6,
+                "value": {
+                    "name": "cost",
+                    "value": "-500",
+                    "hidden": "N",
+                    "type": "descriptor",
+                    "dimension": "Dimensionless",
+                    "unit": "-",
+                    "metadata": "{\"pywr_section\": \"nodes\"}"
+                }
+            },
+            {
+                "source": "NODE",
+                "resource_attr_id": -36,
+                "attr_id": 18,
+                "value": {
+                    "name": "max_flow",
+                    "value": "demand_max_flow",
+                    "hidden": "N",
+                    "type": "descriptor",
+                    "dimension": "Dimensionless",
+                    "unit": "-",
+                    "metadata": "{\"pywr_section\": \"nodes\"}"
+                }
+            }
+        ]
+        nodes_names=["Inflow", "Reservoir", "Spill", "Demand"]
+        imported_nodes = get_pywr_section(self.hydra_model, self.attributes_ids, self.resourcescenarios_ids,
+                                                   'nodes')
+        # test no of imported nodes
+        assert len(imported_nodes)==no_nodes
+        # test imported nodes names
+        for node in imported_nodes:
+            assert node.name in nodes_names
+        imported_nodes_attributes=[]
+        for nodes_attributes in imported_nodes.values():
+            imported_nodes_attributes=imported_nodes_attributes+nodes_attributes
+        compare_hydra_section(expecte_nodes_attributes, imported_nodes_attributes)
 
-    def test_edges(self):
-        pass
+    def test_links(self):
+        '''
+        test imported links
+        '''
+        print "Test links ......"
+
+        links=[["Inflow", "Reservoir"],
+        ["Reservoir", "Demand"],
+        ["Reservoir", "Spill"]]
+        imported_links = get_pywr_section(self.hydra_model, self.attributes_ids, self.resourcescenarios_ids,
+                                      'links')
+        #test no of imported links
+        assert len(imported_links) == len(links)
+        #test link from and to nodes
+        for link in imported_links:
+            from_node=self.nodes_id_name[link.node_1_id]
+            to_node=self.nodes_id_name[link.node_2_id]
+            assert [from_node, to_node] in links
+
+       
 
     def test_metadata(self):
         '''
-               Tesing importing metadata section in pywr json
+                Tesing importing metadata section in pywr json
                :return:
-               '''
+        '''
         print "Testing metatdata ...................................."
         expected_metadata=[
             {

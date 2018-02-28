@@ -513,17 +513,34 @@ def get_pywr_section(network, attributes_ids, resourcescenarios_ids, pywr_sectio
     :param resourcescenarios_ids: dict the keys is resourcescenarios ids and values are the resourcescenarios objects
     it changes global  has_tablerecorder Boolean
     '''
-    recorders={}
-    for attr_ in network.attributes:
-        attr = attributes_ids[attr_.attr_id]
-        res = resourcescenarios_ids[attr_.id]
-        metadata = json.loads(res.value.metadata)
-        if 'pywr_section' in metadata and metadata['pywr_section']==pywr_section:
-        #if (attr.name == 'recorder'):
-            value=json.loads(res.value.value)
-            recorders[attr.name]=get_dict(res)
+    items={}
 
-    return recorders
+    if pywr_section=='nodes':
+        for node in network.nodes:
+            nodes_items = []
+            items[node] = nodes_items
+            for attr_ in node.attributes:
+                attr = attributes_ids[attr_.attr_id]
+                res = resourcescenarios_ids[attr_.id]
+                nodes_items.append(get_dict(res))
+    elif pywr_section == 'links':
+        for link in network.links:
+            link_items=[]
+            items[link]=link_items
+            for attr_ in link.attributes:
+                attr = attributes_ids[attr_.attr_id]
+                res = resourcescenarios_ids[attr_.id]
+                link_items.append( get_dict(res))
+    else:
+        for attr_ in network.attributes:
+            attr = attributes_ids[attr_.attr_id]
+            res = resourcescenarios_ids[attr_.id]
+            metadata = json.loads(res.value.metadata)
+            if 'pywr_section' in metadata and metadata['pywr_section']==pywr_section:
+            #if (attr.name == 'recorder'):
+                value=json.loads(res.value.value)
+                items[attr.name]=get_dict(res)
+    return items
 
 
 
@@ -658,6 +675,7 @@ def get_parameters_refs(nodes):
     return  parameters
 
 
+
 def pywrwriter(network, attrlist, output_file, steps):
     '''
     It reads the Hydra network and convert it to a equivalent pywr model
@@ -668,7 +686,6 @@ def pywrwriter(network, attrlist, output_file, steps):
     '''
     json_file__folder=os.path.dirname(output_file)
     write_progress(4, steps)
-    nodes=[]
     edges=[]
     domains=[]
     attributes_ids={}
@@ -690,6 +707,7 @@ def pywrwriter(network, attrlist, output_file, steps):
                 domains.append(Domain(name, color))
     solver = Solver(network, attributes_ids, resourcescenarios_ids)
     nodes_id_name={}
+    nodes = []
     for node_ in network.nodes:
         node=Node(node_, attributes_ids, resourcescenarios_ids)
         nodes_id_name[node_.id]=node_.name
