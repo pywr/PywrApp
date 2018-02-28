@@ -506,33 +506,25 @@ class Recorder(object):
                 self.node = value[1]
                 self.type = value[0]
 
-def get_recotds(network, attributes_ids, resourcescenarios_ids):
+def get_pywr_section(network, attributes_ids, resourcescenarios_ids, pywr_section):
     '''
     :param network: Hydra network
     :param attributes_ids: dict the keys is attributes ids and values are the attributes objects
     :param resourcescenarios_ids: dict the keys is resourcescenarios ids and values are the resourcescenarios objects
     it changes global  has_tablerecorder Boolean
     '''
-    global has_tablerecorder
+    recorders={}
     for attr_ in network.attributes:
         attr = attributes_ids[attr_.attr_id]
         res = resourcescenarios_ids[attr_.id]
         metadata = json.loads(res.value.metadata)
-        if 'is_recorder' in metadata and bool(metadata['is_recorder'])==True:
+        if 'pywr_section' in metadata and metadata['pywr_section']==pywr_section:
         #if (attr.name == 'recorder'):
-            value=res.value.value
-            metadata = json.loads(res.value.metadata)
-            dic={}
-            recorders[value]=dic
-            for key in metadata.keys():
-                if(key!="user_id" and key!="is_recorder"):
-                    if key=='epsilon':
-                        dic[key] = float(metadata[key])
-                    elif key =='coefficients':
-                        dic[key] = json.loads(metadata[key])
-                    else:
-                        dic[key]=metadata[key]
-            has_tablerecorder=True
+            value=json.loads(res.value.value)
+            recorders[attr.name]=get_dict(res)
+
+    return recorders
+
 
 
 class Domain(object):
