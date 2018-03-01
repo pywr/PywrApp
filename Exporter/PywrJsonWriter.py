@@ -530,7 +530,7 @@ def get_pywr_section(network, attributes_ids, resourcescenarios_ids, pywr_sectio
             for attr_ in link.attributes:
                 attr = attributes_ids[attr_.attr_id]
                 res = resourcescenarios_ids[attr_.id]
-                link_items.append( get_dict(res))
+                link_items.append(get_dict(res))
     else:
         for attr_ in network.attributes:
             attr = attributes_ids[attr_.attr_id]

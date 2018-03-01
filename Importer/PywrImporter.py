@@ -87,6 +87,8 @@ if __name__ == '__main__':
 
     connector=HydraConnector(args)
     c_attrlist = connector.connection.call('get_all_attributes', {})
+    import json
+    #print "c_attrlist:", json.dumps(c_attrlist)
     write_progress(4, steps)
 
     hydra_network, nodes_types, links_types=import_net(args.json_file, c_attrlist, connector.connection)

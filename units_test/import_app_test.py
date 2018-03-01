@@ -7,6 +7,35 @@ from HydraLib.PluginLib import JSONPlugin
 from Importer.PywrJsonReader import  get_pywr_json_from_file, import_net
 
 
+
+def compare_nodes_attributes(excpected_section, imported_section):
+    '''
+    Compare between the expected hydra section with the acutal imported section
+    :param excpected_section: the expected section
+    :param imported_section: the actual imported section
+    :return:
+    '''
+    #print imported_section.values()
+#    assert len(imported_section) == len(excpected_section)
+    for resourceAttribute in excpected_section:
+        asserted=False
+        for node in imported_section.keys():
+            for attr in node.attributes:
+                #check to get the specified node
+                if attr.id== resourceAttribute['resource_attr_id']:
+                    for imported_res in imported_section[node]:
+                        #check for the required node attribute
+                        if imported_res['attr_id']==resourceAttribute['attr_id']:
+                            print "Check attributes:",resourceAttribute['value']['name'], " for node:",node.name
+                            #check all the reseource scnario values
+                            for key in imported_res:
+                                assert key in resourceAttribute
+                                assert imported_res[key] ==resourceAttribute[key]
+                            asserted=True
+        #check if the scenario attribute is found and tested ....
+        assert asserted==True
+
+
 def compare_hydra_section(excpected_section, imported_section):
     '''
     Compare between the expected hydra section with the acutal imported section
@@ -19,8 +48,7 @@ def compare_hydra_section(excpected_section, imported_section):
         # firsttest is the recorder is added
         record_name = record['value']['name']
         print "Testing: ", record_name
-        assert record_name in imported_section;
-        "record was not added!"
+        assert record_name in imported_section
         for key_ in record:
             print "Testing ", key_
             assert key_ in get_dict(imported_section[record_name]);
@@ -300,9 +328,9 @@ class Pywr_to_hydra_importer(unittest.TestCase):
         for node in imported_nodes:
             assert node.name in nodes_names
         imported_nodes_attributes=[]
-        for nodes_attributes in imported_nodes.values():
-            imported_nodes_attributes=imported_nodes_attributes+nodes_attributes
-        compare_hydra_section(expecte_nodes_attributes, imported_nodes_attributes)
+        #for nodes_attributes in imported_nodes.values():
+            #imported_nodes_attributes=imported_nodes_attributes+nodes_attributes
+        compare_nodes_attributes(expecte_nodes_attributes, imported_nodes)
 
     def test_links(self):
         '''
@@ -323,7 +351,7 @@ class Pywr_to_hydra_importer(unittest.TestCase):
             to_node=self.nodes_id_name[link.node_2_id]
             assert [from_node, to_node] in links
 
-       
+
 
     def test_metadata(self):
         '''
