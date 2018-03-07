@@ -19,7 +19,7 @@ def attributes_from_component_dict(components, dimension=''):
         }
 
 
-def data_from_component_dict(components, attribute_ids):
+def data_from_component_dict(components, attribute_ids, dimension=''):
     """ Convert from Pywr components to resource attributes and resource scenarios.
 
     This function is intended to be used to convert Pywr components (e.g. recorders, parameters, etc.)  data
@@ -47,6 +47,18 @@ def data_from_component_dict(components, attribute_ids):
             'attr_is_var': 'N'
         }
 
+        # Make the dataset
+
+        dataset = {
+            'name': component_name,
+            'value': json.dumps(component_data),
+            "hidden": "N",
+            "type": "descriptor",
+            "dimension": dimension,
+            "unit": "-",
+            "metadata": "{}"
+        }
+
         # Make the resource scenario
 
         # TODO the example has a "source" key that's not used here.
@@ -54,7 +66,7 @@ def data_from_component_dict(components, attribute_ids):
         resource_scenario = {
             'resource_attr_id': resource_attribute_id,
             'attr_id': attribute_id,
-            'value': json.dumps(component_data)
+            'value': dataset
         }
 
         resource_attributes.append(resource_attribute)

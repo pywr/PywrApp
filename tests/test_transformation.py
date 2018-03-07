@@ -71,7 +71,8 @@ def test_components_to_attributes(pywr_component_data):
 def test_components_to_datasets(pywr_component_data, hydra_attribute_ids):
     """ Test converting a dict of component data to the format for adding Hydra resource data """
 
-    resource_attributes, resource_scenarios = data_from_component_dict(pywr_component_data, hydra_attribute_ids)
+    resource_attributes, resource_scenarios = data_from_component_dict(pywr_component_data, hydra_attribute_ids,
+                                                                       dimension='recorder')
 
     # There should be one resource attribute and scenario dataset for each component
     assert len(resource_attributes) == len(resource_scenarios) == len(pywr_component_data) == len(hydra_attribute_ids)
@@ -107,12 +108,22 @@ def test_components_to_datasets(pywr_component_data, hydra_attribute_ids):
         else:
             raise ValueError('No attributes with id "{}" found.'.format(data['attr_id']))
 
+        # The dataset should be encoded in the "value" key of resource scenario
+        dataset_data = data['value']
+
+        dataset_data['type'] = 'descriptor'
+        dataset_data['dimension'] = 'recorder'
+        dataset_data['hidden'] = 'N'
+        dataset_data['unit'] = '-'
+        dataset_data['metadata'] = '{}'
+        dataset_data['name'] = attr_name
+
+        # This should be that JSON string.
+        value_json = dataset_data['value']
+
         # This the raw data that should be encoded to a JSON string and become the
         # "value" in the Hydra dataset.
         expected_data = pywr_component_data[attr_name]
-
-        # This should be that JSON string.
-        value_json = data['value']
 
         # If we load back from JSON we can compare
         # Note we can't compare the JSON strings due to formatting and ordering etc.
