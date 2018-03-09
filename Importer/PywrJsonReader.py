@@ -296,23 +296,9 @@ def get_attribute_type_and_value(value_, name, counter, attributes_, _type, res_
         res_attributes.append(ResourceAttr(counter.id, name, _type))
         recourseAttributea.append(RecourseAttribute("NODE", counter.id, name , attributes_[name],"Dimensionless"))
 
-def get_constantscenario(value_, name, counter, attributes_, _type, res_attributes):
-    type="array"
-    metadata = {}
-    metadata["single"] = "yes"
-    metadata["type"]="constantscenario"
-    metadata["scenario"]=value_["scenario"]
-    value = value_["values"]
-    attr = AttributeData(type, json.dumps(value), "-", "Dimensionless", metadata)
-    attributes_[name] = attr
-    counter.id = counter.id - 1
-    if (res_attributes != None):
-        res_attributes.append(ResourceAttr(counter.id, name, _type))
-        recourseAttributea.append(RecourseAttribute("NODE", counter.id, name, attributes_[name], "Dimensionless"))
-
 def get_new_attributes(attrlist, c_attrlist):
     """
-    Get the new attributes which are used in this model to add them to the Hydra
+    Get the new attributes which are used in this model to push them to the Hydra
     :param attrlist: Current Hydra attributes list
     :param c_attrlist: Attributes
     :return: new attributes list
@@ -379,6 +365,87 @@ def get_pywr_json_from_file(filename):
                     main_json.edges.append(edge)
     return main_json, json_list
 
+def import_nodes(main_json, network, project_attributes, counter):
+    '''
+      adding pywr nodes to hydra network which includes their attributes
+    :param main_json: the json which contains the pywr model
+    :param network: hydra networ
+    :param counter: an object is used to get ids, which are negative as it is not saved
+    :param project_attributes: a dict contains all the network attributes, attribute name is the key, the value is the attribute
+    :return nodes_ids: dict contains the nodes ids, name is key, id is the value
+    :return nodes_types which is a dict contains node type as key and name as value
+    '''
+    nodes_ids={}
+    nodes_types={}
+    nodes_attributes = {}
+    global ref_parameters
+    for node_ in main_json["nodes"]:
+        node = Node(node_, counter, nodes_attributes)
+        nodes_ids[node_["name"]] = node.id
+        if node.type in nodes_types.keys():
+            nodes_types[node.type].append(node.name)
+        else:
+            nodes_types[node.type] = [node.name]
+        network.nodes.append(node)
+        counter.id = counter.id - 1
+        for attr_name in nodes_attributes[node.name].keys():
+            if( attr_name not in project_attributes):
+                attr=Attribute(attr_name)
+                project_attributes[attr_name]=attr
+    return nodes_ids, nodes_types,  nodes_attributes
+
+def import_links(main_json, network, counter, project_attributes, nodes_ids):
+    '''
+     import pywr edges to hydra network links
+    :param main_json: the json which contains the pywr model
+    :param network: hydra networ
+    :param counter: an object is used to get ids, which are negative as it is not saved
+    :param project_attributes: a dict contains all the network attributes, attribute name is the key, the value is the attribute
+    :param nodes_ids: dict contains the nodes ids, name is key, id is the value
+    :return:links_types which is a dict contains link type as key and name as value
+    :return links_attributes which is a dict contains attribute name as key and the attributes as the value
+    '''
+    links_types={}
+    links_attributes={}
+    global ref_parameters
+    for edge_ in main_json["edges"]:
+       link=Link(edge_, nodes_ids, counter, links_attributes)
+       if link.type not in links_types:
+           links_types[link.type]=[link.name]
+       else:
+           links_types[link.type].append(link.name)
+       counter.id = counter.id - 1
+       network.links.append(link)
+       for attr_name in links_attributes[link.name].keys():
+           if (attr_name not in project_attributes):
+               attr = Attribute(attr_name)
+               project_attributes[attr_name] = attr
+    return  links_types,links_attributes
+
+def set_resource_attribute_id(network, attributes):
+    '''
+    adjust the recsource scenario attribute id
+    :param network: hydra networ
+    :param attributes: Hydra attributes which contains the new attributes which are created for this model
+    '''
+    attrs_names_ids = {}
+    for tt in attributes:
+        attrs_names_ids[tt.name] = tt.id
+    for rs in recourseAttributea:
+        try:
+            rs.attr_id = attrs_names_ids[rs.attr_id]
+        except:
+            pass
+    network.scenarios[0].resourcescenarios = recourseAttributea
+    for rs in network.attributes:
+        rs.attr_id = attrs_names_ids[rs.attr_id]
+    for node in network.nodes:
+        for rs in node.attributes:
+            rs.attr_id=attrs_names_ids[rs.attr_id]
+    for link in network.links:
+        for rs in link.attributes:
+            rs.attr_id = attrs_names_ids[rs.attr_id]
+
 def import_net (filename, c_attrlist, connector=None):
     """
     Main function which reads the pywr model JSON  string from a file
@@ -395,20 +462,14 @@ def import_net (filename, c_attrlist, connector=None):
     recorders=[]
     domains=[]
     project_attributes = {}
-    nodes_types={}
     global ref_parameters
-    links_types={}
     # dict contains the main pywr variables according to the node type
     nodes_vars_types = {"output": "received_water", "storage": "storage", "link": "flow", "reservoir": "storage", "input":"mean_flow", "catchment":"seasonal_fdc"}
-
-    nodes_attributes={}
-    links_attributes = {}
     network_attributes={}
     main_json, json_list=get_pywr_json_from_file(filename)
     global timeseries
     if "timestepper" in main_json:
         timeseries=get_timeseriesdates(main_json["timestepper"])
-
     global scenarios
     if "scenarios" in main_json:
         for scenario in main_json["scenarios"]:
@@ -430,15 +491,10 @@ def import_net (filename, c_attrlist, connector=None):
                           timestepper)
     #add new new network attributes to project attributes
     for attr_name in network_attributes[network.name].keys():
-        if (attr_name in project_attributes):
-            pass
-        else:
+        if (attr_name not in project_attributes):
             attr = Attribute(attr_name)
             project_attributes[attr_name] = attr
-
     counter.id=counter.id-1
-    nodes_ids={}
-    #dict contains nodes names as keys and nodes ids as values
     i = 0
     for json_ in json_list:
         if ("parameters" in json_):
@@ -447,57 +503,18 @@ def import_net (filename, c_attrlist, connector=None):
                 counter.id = counter.id - 1
                 get_attribute_type_and_value(json_["parameters"].values()[i], k, counter, ref_parameters, "default")
 
-    for node_ in main_json["nodes"]:
-        node = Node(node_, counter, nodes_attributes)
-        nodes_ids[node_["name"]] = node.id
-        if node.type in nodes_types.keys():
-            nodes_types[node.type].append(node.name)
-        else:
-            nodes_types[node.type] = [node.name]
-        network.nodes.append(node)
-        counter.id = counter.id - 1
-        for attr_name in nodes_attributes[node.name].keys():
-            if( attr_name in project_attributes):
-                pass
-            else:
-                attr=Attribute(attr_name)
-                project_attributes[attr_name]=attr
+    ## adding pywr nodes to hydra network which includes their attributes
+    nodes_ids, nodes_types, nodes_attributes = import_nodes(main_json, network, project_attributes, counter)
     ## add pywr edges to hydra network links
-    for edge_ in main_json["edges"]:
-       link=Link(edge_, nodes_ids, counter, links_attributes)
-       if link.type not in links_types:
-           links_types[link.type]=[link.name]
-       else:
-           links_types[link.type].append(link.name)
-       counter.id = counter.id - 1
-       network.links.append(link)
-       for attr_name in links_attributes[link.name].keys():
-           if (attr_name not in project_attributes):
-               attr = Attribute(attr_name)
-               project_attributes[attr_name] = attr
+    links_types, links_attributes = import_links(main_json, network, counter, project_attributes, nodes_ids)
     new_attr = get_new_attributes(project_attributes.values(), c_attrlist)
     if connector!=None:
         attributes = connector.call("add_attributes", {"attrs": new_attr})
     else:
         attributes=c_attrlist
-    attrs_names_ids={}
-    for tt in attributes:
-        attrs_names_ids[tt.name]=tt.id
-    for rs in recourseAttributea:
-        try:
-            rs.attr_id=attrs_names_ids[rs.attr_id]
-        except:
-            pass
-    network.scenarios[0].resourcescenarios=recourseAttributea
-    for rs in network.attributes:
-        rs.attr_id = attrs_names_ids[rs.attr_id]
-    for node in network.nodes:
-        for rs in node.attributes:
-            rs.attr_id=attrs_names_ids[rs.attr_id]
-    for link in network.links:
-        for rs in link.attributes:
-            rs.attr_id = attrs_names_ids[rs.attr_id]
-    #print json.dumps(get_dict(network))
+
+    set_resource_attribute_id(network, attributes)
+
     return network,nodes_types, links_types
 
 def add_network(network, connector,nodes_types, links_types):
@@ -505,14 +522,14 @@ def add_network(network, connector,nodes_types, links_types):
     project=Project()
     proj = connector.call("add_project", {"project": project.__dict__})
     network.project_id=proj.id
-    print json.dumps(get_dict(network))
+    #print json.dumps(get_dict(network))
     NetworkSummary = connector.call("add_network", {"net": get_dict(network)})
     # Push pywr template to Hydra and set nodes and links types
     set_resource_types(nodes_types, links_types, network.type, NetworkSummary, connector)
     return NetworkSummary
 
-
 def set_resource_types(nodes_types, links_types, networktype, NetworkSummary, connection):
+    ## assign resources types using the template file
     template_file="..\PywrNetwork.xml"
     #print("Setting resource types based on %s." % template_file)
     with open(template_file) as f:
