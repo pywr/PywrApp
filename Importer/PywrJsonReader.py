@@ -68,92 +68,44 @@ class RecourseAttribute (object):
         self.value=value_
 
 class Node(object):
-    def __init__(self, node_, counter, nodes_attributes):
-        global  has_tablerecorder
-        is_flow=True
-        attributes_ = {}
-        self.attributes = []
-        ras = []
-        x=None
-        y=None
-        i=0
-        self.id = counter.id
+    def __init__(self, name, id,x, y,description, type, attributes ):
+        self.name=name
+        self.id=id
         self.status = "A"
-        self.name = node_["name"]
-        self.type = node_["type"]
-        self.description = ""
-        if hasattr(node_, "position"):
-            if hasattr(node_.position, "position"):
-                if(node_.position.schematic != None and len (node_.position.schematic)==2):
-                    x=str(node_.position.schematic[0])
-                    y=str(node_.position.schematic[1])
-        if(x != None):
-            self.x = str(x)
-        else:
-            self.x='0'
-        if(y!=None):
-            self.y = str(y)
-        else:
-            self.y='0'
-        keys_=sorted(node_.keys())
-        for i in range(0, len(keys_)):#.__dict__.keys())):
-            k=keys_[i]
-            if(k.lower() != "name" and k.lower() !="type" and k.lower() !="position"):
-                val=str(node_[k])
-                if k=='comment':
-                    self.description=val
-                    continue
-                counter.id = counter.id - 1
-                attributes_[k] = AttributeData("descriptor", val, "-", "Dimensionless", k,
-                                                 {"pywr_section":'nodes'})
-                self.attributes.append(ResourceAttr(counter.id, k, "Input"))
-                recourseAttributea.append(
-                RecourseAttribute("NODE", counter.id, k, attributes_[k], "Dimensionless"))
-
-
-
-                #get_attribute_type_and_value(val, k, counter, attributes_, "input", self.attributes)
-
-        #get_attribute_type_and_value(node_["type"], "node_type", counter, attributes_, "input", self.attributes)
-        nodes_attributes [self.name]= attributes_
+        self.x=x
+        self.y=y
+        self.description=description
+        self.type=type
+        self.attributes=attributes
 
 class Link(object):
     """
     Hydra link from pywr edge
     """
-    def __init__(self, edge_, nodes_ids, counter, links_attributes):
-        self.node_1_id = nodes_ids[edge_[0]]
-        self.node_2_id = nodes_ids[edge_[1]]
-        self.name = edge_[0] + "_" + edge_[1]
-        self.description=""
-        self.attributes = []
-        self.type="edge"
-        if(len(edge_)==4):
-            slot_from=edge_[2]
-            slot_to=edge_[3]
-        else:
-            slot_from = None
-            slot_to = None
-        self.id = counter.id
+    def __init__(self, node_1_id, node_2_id, name, link_id, description, type, attributes ):
         self.status = "A"
-        self.attributes=[]
-        attributes_ = {}
-        if slot_from != None:
-            counter.id = counter.id - 1
-            attributes_["slot_from"]=AttributeData("descriptor", str(slot_from), "-", "Dimensionless","slot_from", {"pywr_section":'links'})
-            self.attributes.append(ResourceAttr(counter.id, "slot_from","Input"))
-            recourseAttributea.append(RecourseAttribute("LINK", counter.id, "slot_from", attributes_["slot_from"], "Dimensionless"))
-        if slot_to != None:
-            counter.id = counter.id - 1
-            attributes_["slot_to"]=AttributeData("descriptor", str(slot_to), "-", "Dimensionless", "slot_to", {"pywr_section":'links'})
-            self.attributes.append(ResourceAttr(counter.id, "slot_to", "Input"))
-            recourseAttributea.append(RecourseAttribute("LINK", counter.id, "slot_to", attributes_["slot_to"], "Dimensionless"))
-        links_attributes[self.name]=attributes_
+        self.node_1_id=node_1_id
+        self.node_2_id=node_2_id
+        self.name=name
+        self.id=link_id
+        self.description=description
+        self.type=type
+        self.attributes=attributes
+
 
 class Network (object):
-    """
-     Create Hydra network
-    """
+    def __init__(self, name, project_id, type, attributes):
+        self.id = -1
+        self.nodes = []
+        self.links = []
+        self.scenarios = [Scenario()]
+        self.name=name
+        self.project_id=project_id
+        self.type=type
+        self.attributes=attributes
+
+    '''  
+        
     def __init__(self, name, solver_name, project_id, counter, domains, recorders, network_attributes, timestepper,  main_Json):
         """
         :param name: network name
@@ -199,6 +151,7 @@ class Network (object):
         self.links=[]
         self.scenarios=[Scenario()]
         network_attributes[self.name] = attributes_
+    '''
 
 class Scenario(object):
     """
@@ -365,6 +318,150 @@ def get_pywr_json_from_file(filename):
                     main_json.edges.append(edge)
     return main_json, json_list
 
+
+def create_hydra_network(name, solver_name, project_id, counter, domains, recorders, network_attributes, timestepper,
+                         main_Json):
+    """
+     Create Hydra network
+
+   :param name: network name
+   :param solver_name: pywr solver name, it will be added as network attribute
+   :param project_id: Hydra project id
+   :param counter: object contains id which is used to estimate attribute and scenario attributes ids
+   :param domains: doamin section inside pywr, it will be saved as network attributes
+   :param recorders: conatins pywr recorder section, some of them will be saved as network attributes
+   :param network_attributes: other network attributes
+   :param timestepper: pywr timestepper
+   :param metadata: pywr metadata
+   """
+    # print "recorders:=>>", get_dict(recorders)
+    global has_tablerecorder
+
+    attributes = []
+    global scenarios
+    attributes_ = {}
+    name = "Pywr_network"
+    project_id = project_id
+    type = "PywrNetwork"
+    author = None
+    minimum_version = None
+    for key in main_Json:
+        if key == "nodes" or key == "edges":
+            continue
+        if key == "recorders" or key == "parameters":
+            for pars in main_Json[key]:
+                counter.id = counter.id - 1
+                attributes_[pars] = AttributeData("descriptor", main_Json[key][pars], "-", "Dimensionless", pars,
+                                                  {"pywr_section": key})
+                attributes.append(ResourceAttr(counter.id, pars, "Input"))
+                recourseAttributea.append(
+                    RecourseAttribute("NETWORK", counter.id, pars, attributes_[pars], "Dimensionless"))
+        else:
+            counter.id = counter.id - 1
+            attributes_[key] = AttributeData("descriptor", main_Json[key], "-", "Dimensionless", key,
+                                             {"pywr_section": key})
+            attributes.append(ResourceAttr(counter.id, key, "Input"))
+            recourseAttributea.append(RecourseAttribute("NETWORK", counter.id, key, attributes_[key], "Dimensionless"))
+
+    network_attributes[name] = attributes_
+    network = Network(name, project_id, type, attributes)
+    return network
+
+def create_hydra_node(node_, counter, nodes_attributes):
+    '''
+    Create Hydra node from pywr node
+    :param node_: pywr node
+    :param counter: object contians id member which is used create the nodes and their hydra attributes
+    :param nodes_attributes: dict contains nodes name(key), and nodes attributes(value)
+    :return:
+    '''
+    attributes_ = {}
+    global has_tablerecorder
+    attributes_ = {}
+    attributes = []
+    ras = []
+    x = None
+    y = None
+    i = 0
+    node_id = counter.id
+    name = node_["name"]
+    type = node_["type"]
+    description = ""
+    if hasattr(node_, ""):
+        if hasattr(node_.position, "position"):
+            if (node_.position.schematic != None and len(node_.position.schematic) == 2):
+                x = str(node_.position.schematic[0])
+                y = str(node_.position.schematic[1])
+    if (x != None):
+        x = str(x)
+    else:
+        x = '0'
+    if (y != None):
+        y = str(y)
+    else:
+        y = '0'
+    keys_ = sorted(node_.keys())
+    for i in range(0, len(keys_)):  # .__dict__.keys())):
+        k = keys_[i]
+        if (k.lower() != "name" and k.lower() != "type" and k.lower() != "position"):
+            val = str(node_[k])
+            if k == 'comment':
+                description = val
+                continue
+            counter.id = counter.id - 1
+            attributes_[k] = AttributeData("descriptor", val, "-", "Dimensionless", k,
+                                           {"pywr_section": 'nodes'})
+            attributes.append(ResourceAttr(counter.id, k, "Input"))
+            recourseAttributea.append(
+                RecourseAttribute("NODE", counter.id, k, attributes_[k], "Dimensionless"))
+    nodes_attributes[name] = attributes_
+    node = Node(name, node_id, x, y, description, type, attributes)
+    return node
+
+
+def create_hydra_link(edge_, nodes_ids, counter, links_attributes):
+    '''
+    Create Hydra link from Pywr edge
+    :param edge_:  pywr edge
+    :param nodes_ids: dict contains nodes ids
+    :param counter: object contians id member which is used create the links and their hydra attributes
+    :param links_attributes:
+    :return:
+    '''
+    node_1_id = nodes_ids[edge_[0]]
+    node_2_id = nodes_ids[edge_[1]]
+    name = edge_[0] + "_" + edge_[1]
+    description = ""
+    attributes = []
+    type = "edge"
+    if (len(edge_) == 4):
+        slot_from = edge_[2]
+        slot_to = edge_[3]
+    else:
+        slot_from = None
+        slot_to = None
+    link_id = counter.id
+
+    attributes = []
+    attributes_ = {}
+    if slot_from != None:
+        counter.id = counter.id - 1
+        attributes_["slot_from"] = AttributeData("descriptor", str(slot_from), "-", "Dimensionless", "slot_from",
+                                                 {"pywr_section": 'links'})
+        attributes.append(ResourceAttr(counter.id, "slot_from", "Input"))
+        recourseAttributea.append(
+            RecourseAttribute("LINK", counter.id, "slot_from", attributes_["slot_from"], "Dimensionless"))
+    if slot_to != None:
+        counter.id = counter.id - 1
+        attributes_["slot_to"] = AttributeData("descriptor", str(slot_to), "-", "Dimensionless", "slot_to",
+                                               {"pywr_section": 'links'})
+        attributes.append(ResourceAttr(counter.id, "slot_to", "Input"))
+        recourseAttributea.append(
+            RecourseAttribute("LINK", counter.id, "slot_to", attributes_["slot_to"], "Dimensionless"))
+    links_attributes[name] = attributes_
+    link = Link(node_1_id, node_2_id, name, link_id, description, type, attributes)
+    return link
+
 def import_nodes(main_json, network, project_attributes, counter):
     '''
       adding pywr nodes to hydra network which includes their attributes
@@ -380,7 +477,8 @@ def import_nodes(main_json, network, project_attributes, counter):
     nodes_attributes = {}
     global ref_parameters
     for node_ in main_json["nodes"]:
-        node = Node(node_, counter, nodes_attributes)
+        #node = Node(node_, counter, nodes_attributes)
+        node = create_hydra_node(node_, counter, nodes_attributes)
         nodes_ids[node_["name"]] = node.id
         if node.type in nodes_types.keys():
             nodes_types[node.type].append(node.name)
@@ -409,7 +507,8 @@ def import_links(main_json, network, counter, project_attributes, nodes_ids):
     links_attributes={}
     global ref_parameters
     for edge_ in main_json["edges"]:
-       link=Link(edge_, nodes_ids, counter, links_attributes)
+       link=create_hydra_link(edge_, nodes_ids, counter, links_attributes)
+
        if link.type not in links_types:
            links_types[link.type]=[link.name]
        else:
@@ -484,10 +583,11 @@ def import_net (filename, c_attrlist, connector=None):
         solver_name=main_json["solver"]
 
     if ("metadata" in main_json):
-        network = Network("Pywr",solver_name, -1, counter, domains, recorders, network_attributes,
+        create_hydra_network
+        network = create_hydra_network("Pywr",solver_name, -1, counter, domains, recorders, network_attributes,
                           timestepper, main_json)
     else:
-        network = Network("Pywr", solver_name, -1, counter, domains, recorders, network_attributes,
+        network = create_hydra_network("Pywr", solver_name, -1, counter, domains, recorders, network_attributes,
                           timestepper)
     #add new new network attributes to project attributes
     for attr_name in network_attributes[network.name].keys():
@@ -498,10 +598,9 @@ def import_net (filename, c_attrlist, connector=None):
     i = 0
     for json_ in json_list:
         if ("parameters" in json_):
-            for i in range(0, len(json_["parameters"].keys())):
-                k = json_["parameters"].keys()[i]
+            for k, value in json_["parameters"].items():
                 counter.id = counter.id - 1
-                get_attribute_type_and_value(json_["parameters"].values()[i], k, counter, ref_parameters, "default")
+                get_attribute_type_and_value(value, k, counter, ref_parameters, "default")
 
     ## adding pywr nodes to hydra network which includes their attributes
     nodes_ids, nodes_types, nodes_attributes = import_nodes(main_json, network, project_attributes, counter)
