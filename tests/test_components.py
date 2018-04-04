@@ -4,7 +4,7 @@ The unit tests in this module test the internal behaviour of the Pywr-Hydra appl
 """
 import pytest
 import json
-from hydra_pywr import attributes_from_component_dict, data_from_component_dict
+from hydra_pywr.importer import PywrHydraImporter
 
 
 @pytest.fixture()
@@ -26,6 +26,11 @@ def pywr_component_data():
 
 
 @pytest.fixture()
+def pywr_component_importer(pywr_component_data):
+    return PywrHydraImporter({'recorders': pywr_component_data})
+
+
+@pytest.fixture()
 def hydra_attribute_data():
     """ Example attribute data
 
@@ -35,13 +40,13 @@ def hydra_attribute_data():
         {
             "id": 1,
             "name": "my_component",
-            "dimension": "recorder",
+            "dimension": "dimensionless",
             "description": ""
         },
         {
             "id": 2,
             "name": "my_other_component",
-            "dimension": "recorder",
+            "dimension": "dimensionless",
             "description": ""
         },
     ]
@@ -52,30 +57,32 @@ def hydra_attribute_ids(hydra_attribute_data):
     return {d["name"]: d["id"] for d in hydra_attribute_data}
 
 
-def test_components_to_attributes(pywr_component_data):
+def test_components_to_attributes(pywr_component_importer):
     """ Test converting a dict of component data to the format for a adding Hydra attributes """
+    importer = pywr_component_importer
 
-    hydra_data = attributes_from_component_dict(pywr_component_data, dimension='recorder')
+    hydra_data = importer.attributes_from_component_dict('recorders')
 
     # There should be a hydra attribute for each entry in the pywr data
-    assert len(list(hydra_data)) == len(pywr_component_data)
+    assert len(list(hydra_data)) == len(importer.data['recorders'])
 
-    pywr_keys = list(pywr_component_data.keys())
+    pywr_keys = list(importer.data['recorders'].keys())
 
     for data in hydra_data:
         assert data['name'] in pywr_keys
-        assert data['dimensions'] == 'recorder'
+        assert data['dimensions'] == 'dimensionless'
         assert data['description'] == ''
 
         
-def test_components_to_datasets(pywr_component_data, hydra_attribute_ids):
+def test_components_to_datasets(pywr_component_importer, hydra_attribute_ids):
     """ Test converting a dict of component data to the format for adding Hydra resource data """
+    importer = pywr_component_importer
 
-    resource_attributes, resource_scenarios = data_from_component_dict(pywr_component_data, hydra_attribute_ids,
+    resource_attributes, resource_scenarios = importer.data_from_component_dict('recorders', hydra_attribute_ids,
                                                                        dimension='recorder')
 
     # There should be one resource attribute and scenario dataset for each component
-    assert len(resource_attributes) == len(resource_scenarios) == len(pywr_component_data) == len(hydra_attribute_ids)
+    assert len(resource_attributes) == len(resource_scenarios) == len(importer.data['recorders']) == len(hydra_attribute_ids)
 
     # Check the attributes first
     for data in resource_attributes:
@@ -123,7 +130,7 @@ def test_components_to_datasets(pywr_component_data, hydra_attribute_ids):
 
         # This the raw data that should be encoded to a JSON string and become the
         # "value" in the Hydra dataset.
-        expected_data = pywr_component_data[attr_name]
+        expected_data = importer.data['recorders'][attr_name]
 
         # If we load back from JSON we can compare
         # Note we can't compare the JSON strings due to formatting and ordering etc.
