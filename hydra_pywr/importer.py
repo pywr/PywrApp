@@ -87,6 +87,12 @@ class PywrHydraImporter:
 
         nodes, links, resource_scenarios = self.convert_nodes_and_edges(attribute_ids)
 
+        network_attributes = []
+        for component_key in ('recorders', 'parameters'):
+            for resource_attribute, resource_scenario in self.generate_component_resource_scenarios(component_key, attribute_ids):
+                network_attributes.append(resource_attribute)
+                resource_scenarios.append(resource_scenario)
+
         scenario = self.make_scenario(resource_scenarios)
 
         data = {
@@ -98,7 +104,7 @@ class PywrHydraImporter:
             "layout": None,
             "scenarios": [scenario, ],
             "projection": projection,
-            "attributes": [],
+            "attributes": network_attributes,
             "types": [],
         }
         return data
@@ -275,7 +281,7 @@ class PywrHydraImporter:
                 'description': ''
             }
 
-    def data_from_component_dict(self, component_key, attribute_ids, dimension='dimensionless', resource_attribute_id=-1):
+    def generate_component_resource_scenarios(self, component_key, attribute_ids, dimension='dimensionless'):
         """ Convert from Pywr components to resource attributes and resource scenarios.
 
         This function is intended to be used to convert Pywr components (e.g. recorders, parameters, etc.)  data
@@ -285,11 +291,15 @@ class PywrHydraImporter:
         to Hydra.
 
         """
-        components = self.data[component_key]
-        resource_attributes = []
-        resource_scenarios = []
+        try:
+            components = self.data[component_key]
+        except KeyError:
+            components = {}
 
         for component_name, component_data in components.items():
+
+            resource_attribute_id = self.next_resource_attribute_id
+            self.next_resource_attribute_id -= 1
 
             # This the attribute corresponding to the component.
             # It should have a positive id and already be entered in the hydra database.
@@ -324,9 +334,4 @@ class PywrHydraImporter:
                 'value': dataset
             }
 
-            resource_attributes.append(resource_attribute)
-            resource_scenarios.append(resource_scenario)
-
-            resource_attribute_id -= 1
-
-        return resource_attributes, resource_scenarios
+            yield resource_attribute, resource_scenario

@@ -7,6 +7,8 @@ from hydra_pywr.importer import PywrHydraImporter
 from hydra_pywr.template import generate_pywr_attributes, generate_pywr_template
 import hydra_base
 from hydra_base.lib.objects import JSONObject, Dataset
+import pytest
+import json
 
 
 def convert_network_to_json_object(network):
@@ -19,10 +21,39 @@ def convert_network_to_json_object(network):
     return json_network
 
 
-def test_add_simple_network(simple1, session, projectmaker, root_user_id):
+def assert_hydra_pywr(hydra_data, pywr_data):
+    """ Compare Hydra and Pywr data for a model and raise an `AssertionError` if they are different.
+
+    This is a convenience function for testing purposes. It compares Hydra data in the
+    format suitable to send to an add network request with the Pywr JSON data.
+
+    """
+
+    assert len(hydra_data['nodes']) == len(pywr_data['nodes'])
+    assert len(hydra_data['links']) == len(pywr_data['edges'])
+
+    # Ensure that the pywr parameters exist as a hydra dataset
+    if 'parameters' in pywr_data:
+        for parameter_name, parameter_value in pywr_data['parameters'].items():
+            found = False
+            for scenario in hydra_data['scenarios']:
+                for rs in scenario['resourcescenarios']:
+                    # The data in hydra is stored as a JSON encoded string.
+                    # Load it back to Python types for comparison with Pywr data.
+                    hydra_value = json.loads(rs['value']['value'])
+                    if hydra_value == parameter_value:
+                        found = True
+                        break
+
+            if not found:
+                raise AssertionError('Parameter "{}" value not found in the hydra resource '
+                                     'scenario data.'.format(parameter_name))
+
+
+def test_add_network(pywr_json_filename, session, projectmaker, root_user_id):
     project = projectmaker.create()
 
-    importer = PywrHydraImporter(simple1)
+    importer = PywrHydraImporter(pywr_json_filename)
 
     # First create the Pywr specific attribute groups.
     attribute_group_ids = {}
@@ -41,6 +72,13 @@ def test_add_simple_network(simple1, session, projectmaker, root_user_id):
 
     # Now we try to create the network
     network = importer.add_network_request_data(attribute_ids, project.project_id)
+
+    # Check transformed data is about right
+    with open(pywr_json_filename) as fh:
+        pywr_data = json.load(fh)
+
+    assert_hydra_pywr(network, pywr_data)
+
     json_network = convert_network_to_json_object(network)
 
     hydra_base.add_network(json_network, user_id=root_user_id)
