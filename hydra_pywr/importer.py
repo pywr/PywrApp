@@ -55,7 +55,11 @@ class PywrHydraImporter:
     def add_attributes_request_data(self):
         """ Generate the data for adding attributes to Hydra. """
 
-        # First yield the attributes from the nodes ...
+        # Yield attributes from the timestepper ...
+        for attr in self.attributes_from_meta():
+            yield attr
+
+        # Yield the attributes from the nodes ...
         for attr in self.attributes_from_nodes():
             yield attr
 
@@ -92,6 +96,11 @@ class PywrHydraImporter:
             for resource_attribute, resource_scenario in self.generate_component_resource_scenarios(component_key, attribute_ids):
                 network_attributes.append(resource_attribute)
                 resource_scenarios.append(resource_scenario)
+
+        for resource_attribute, resource_scenario in self.generate_meta_resource_scenarios(attribute_ids):
+            print(resource_attribute, resource_scenario)
+            network_attributes.append(resource_attribute)
+            resource_scenarios.append(resource_scenario)
 
         scenario = self.make_scenario(resource_scenarios)
 
@@ -150,6 +159,19 @@ class PywrHydraImporter:
                 'dimension': dimension,
                 'description': ''
             }
+
+    def attributes_from_meta(self, dimension='dimensionless'):
+        """ Generator to convert Pywr timestepper data in to Hydra attribute data. """
+
+        for meta_key in ('metadata', 'timestepper'):
+            for key, value in self.data[meta_key].items():
+                # Prefix these names with Pywr JSON section.
+                name = '{}_{}'.format(meta_key, key)
+                yield {
+                    'name': name,
+                    'dimension': dimension,
+                    'description': ''
+                }
 
     def convert_nodes_and_edges(self, attribute_ids):
         """ Convert a tuple of (nodes, links) of Hydra data based on the given Pywr data. """
@@ -218,6 +240,41 @@ class PywrHydraImporter:
 
         return hydra_nodes, hydra_links, hydra_resource_scenarios
 
+    def _make_dataset_resource_attribute_and_scenario(self, name, value, attribute_id, dimension='dimensionless',
+                                                      encode_to_json=False,):
+        """ A helper method to make a dataset, resource attribute and resource scenario. """
+
+        resource_attribute_id = self.next_resource_attribute_id
+        self.next_resource_attribute_id -= 1
+
+        # Create a dataset representing the value
+        dataset = {
+            'name': name,
+            'value': json.dumps(value) if encode_to_json else value,
+            "hidden": "N",
+            "type": "descriptor",
+            "dimension": dimension,
+            "unit": "-",
+            "metadata": "{}"
+        }
+
+        # Create a resource scenario linking the dataset to the scenario
+        resource_scenario = {
+            'resource_attr_id': resource_attribute_id,
+            'attr_id': attribute_id,
+            'value': dataset
+        }
+
+        # Create a resource attribute linking the resource scenario to the node
+        resource_attribute = {
+            'id': resource_attribute_id,
+            'attr_id': attribute_id,
+            'attr_is_var': 'N'
+        }
+
+        # Finally add the resource attribute to the hydra node data
+        return resource_attribute, resource_scenario
+
     def generate_node_resource_scenarios(self, pywr_node, attribute_ids, dimension='dimensionless'):
         """ Generate resource attribute, resource scenario and datasets for a Pywr node.
 
@@ -226,42 +283,13 @@ class PywrHydraImporter:
             if key in self.PYWR_PROTECTED_NODE_KEYS:
                 continue
             # Non-protected keys represent data that must be added to Hydra.
-            # To do this we need to create the following ...
-
-            resource_attribute_id = self.next_resource_attribute_id
-            self.next_resource_attribute_id -= 1
 
             # Key is the attribute name. The attributes need to already by added to the
             # database and hence have a valid id.
             attribute_id = attribute_ids[key]
 
-            # Create a dataset representing the value
-            dataset = {
-                'name': key,
-                'value': json.dumps(pywr_node[key]),
-                "hidden": "N",
-                "type": "descriptor",
-                "dimension": dimension,
-                "unit": "-",
-                "metadata": "{}"
-            }
-
-            # Create a resource scenario linking the dataset to the scenario
-            resource_scenario = {
-                'resource_attr_id': resource_attribute_id,
-                'attr_id': attribute_id,
-                'value': dataset
-            }
-
-            # Create a resource attribute linking the resource scenario to the node
-            resource_attribute = {
-                'id': resource_attribute_id,
-                'attr_id': attribute_id,
-                'attr_is_var': 'N'
-            }
-
-            # Finally add the resource attribute to the hydra node data
-            yield resource_attribute, resource_scenario
+            yield self._make_dataset_resource_attribute_and_scenario(key, pywr_node[key], attribute_id,
+                                                                     encode_to_json=True, dimension=dimension)
 
     def attributes_from_component_dict(self, component_key, dimension='dimensionless'):
         """ Generator to convert Pywr components data in to Hydra attribute data.
@@ -297,41 +325,21 @@ class PywrHydraImporter:
             components = {}
 
         for component_name, component_data in components.items():
-
-            resource_attribute_id = self.next_resource_attribute_id
-            self.next_resource_attribute_id -= 1
-
             # This the attribute corresponding to the component.
             # It should have a positive id and already be entered in the hydra database.
             attribute_id = attribute_ids[component_name]
 
-            # Make the resource attribute
-            resource_attribute = {
-                'id': resource_attribute_id,
-                'attr_id': attribute_id,
-                'attr_is_var': 'N'
-            }
+            yield self._make_dataset_resource_attribute_and_scenario(component_name, component_data, attribute_id,
+                                                                     encode_to_json=True, dimension=dimension)
 
-            # Make the dataset
+    def generate_meta_resource_scenarios(self, attribute_ids, dimension='dimensionless'):
+        """ Convert Pywr timestepper data to resource attributes and resource scenarios. """
 
-            dataset = {
-                'name': component_name,
-                'value': json.dumps(component_data),
-                "hidden": "N",
-                "type": "descriptor",
-                "dimension": dimension,
-                "unit": "-",
-                "metadata": "{}"
-            }
+        for meta_key in ('metadata', 'timestepper'):
+            for key, value in self.data[meta_key].items():
+                # Prefix these names with Pywr JSON section.
+                name = '{}_{}'.format(meta_key, key)
+                attribute_id = attribute_ids[name]
 
-            # Make the resource scenario
-
-            # TODO the example has a "source" key that's not used here.
-            # TODO possible other metadata to add.
-            resource_scenario = {
-                'resource_attr_id': resource_attribute_id,
-                'attr_id': attribute_id,
-                'value': dataset
-            }
-
-            yield resource_attribute, resource_scenario
+                yield self._make_dataset_resource_attribute_and_scenario(name, value, attribute_id,
+                                                                         encode_to_json=False, dimension=dimension)

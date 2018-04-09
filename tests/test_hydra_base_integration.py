@@ -21,6 +21,21 @@ def convert_network_to_json_object(network):
     return json_network
 
 
+def assert_dataset(hydra_data, key, value, decode_from_json=False):
+    """ Raise an assertion error if the value is not found as a resource scenario's dataset. """
+
+    for scenario in hydra_data['scenarios']:
+        for rs in scenario['resourcescenarios']:
+            hydra_value = rs['value']['value']
+            if decode_from_json:
+                # The data in hydra is stored as a JSON encoded string.
+                # Load it back to Python types for comparison with Pywr data.
+                hydra_value = json.loads(hydra_value)
+            if hydra_value == value:
+                return
+    raise AssertionError('Dataset "{}" value not found in the hydra resource scenario data.'.format(key))
+
+
 def assert_hydra_pywr(hydra_data, pywr_data):
     """ Compare Hydra and Pywr data for a model and raise an `AssertionError` if they are different.
 
@@ -32,22 +47,20 @@ def assert_hydra_pywr(hydra_data, pywr_data):
     assert len(hydra_data['nodes']) == len(pywr_data['nodes'])
     assert len(hydra_data['links']) == len(pywr_data['edges'])
 
-    # Ensure that the pywr parameters exist as a hydra dataset
-    if 'parameters' in pywr_data:
-        for parameter_name, parameter_value in pywr_data['parameters'].items():
-            found = False
-            for scenario in hydra_data['scenarios']:
-                for rs in scenario['resourcescenarios']:
-                    # The data in hydra is stored as a JSON encoded string.
-                    # Load it back to Python types for comparison with Pywr data.
-                    hydra_value = json.loads(rs['value']['value'])
-                    if hydra_value == parameter_value:
-                        found = True
-                        break
+    # Ensure that the time-stepper information exists.
+    timestepper = pywr_data['timestepper']
+    for key, value in timestepper.items():
+        assert_dataset(hydra_data, key, value)
 
-            if not found:
-                raise AssertionError('Parameter "{}" value not found in the hydra resource '
-                                     'scenario data.'.format(parameter_name))
+    metadata = pywr_data['metadata']
+    for key, value in metadata.items():
+        assert_dataset(hydra_data, key, value)
+
+    # Ensure that the pywr parameters exist as a hydra dataset
+    for component in ('parameters', 'recorders'):
+        if component in pywr_data:
+            for component_name, component_value in pywr_data[component].items():
+                assert_dataset(hydra_data, component_name, component_value, decode_from_json=True)
 
 
 def test_add_network(pywr_json_filename, session, projectmaker, root_user_id):
