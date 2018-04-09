@@ -1,24 +1,14 @@
 """
-The unit tests in here iteract directly with hydra-base (rather than using the Web API).
+The unit tests in here interact directly with hydra-base (rather than using the Web API).
 """
+from helpers import *
 from fixtures import *
 from hydra_base_fixtures import *
 from hydra_pywr.importer import PywrHydraImporter
 from hydra_pywr.template import generate_pywr_attributes, generate_pywr_template
 import hydra_base
-from hydra_base.lib.objects import JSONObject, Dataset
 import pytest
 import json
-
-
-def convert_network_to_json_object(network):
-
-    json_network = JSONObject(network)
-    for scenario in json_network['scenarios']:
-        for rs in scenario['resourcescenarios']:
-            rs.value = Dataset(rs['value'])
-
-    return json_network
 
 
 def assert_dataset(hydra_data, key, value, decode_from_json=False):
