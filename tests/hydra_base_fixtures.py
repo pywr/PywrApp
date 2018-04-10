@@ -125,7 +125,7 @@ def create_project(name=None):
         project.name = name
         project.description = "Project which contains all unit test networks"
         project = JSONObject(hydra_base.add_project(project, user_id=user_id))
-        hydra_base.share_project(project.project_id,
+        hydra_base.share_project(project.id,
                                  ["UserA", "UserB", "UserC"],
                                  'N',
                                  'Y',

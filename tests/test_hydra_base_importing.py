@@ -60,7 +60,7 @@ def test_add_network(pywr_json_filename, session, projectmaker, root_user_id):
 
     # First create the Pywr specific attribute groups.
     attribute_group_ids = {}
-    for group_data in importer.add_attribute_group_request_data(project.project_id):
+    for group_data in importer.add_attribute_group_request_data(project.id):
         response_group = hydra_base.add_attribute_group(JSONObject(group_data), user_id=root_user_id)
         attribute_group_ids[group_data['name']] = response_group.id
 
@@ -74,7 +74,7 @@ def test_add_network(pywr_json_filename, session, projectmaker, root_user_id):
     attribute_ids = {a.attr_name: a.attr_id for a in response_attributes}
 
     # Now we try to create the network
-    network = importer.add_network_request_data(attribute_ids, project.project_id)
+    network = importer.add_network_request_data(attribute_ids, project.id)
 
     # Check transformed data is about right
     with open(pywr_json_filename) as fh:
