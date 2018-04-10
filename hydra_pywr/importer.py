@@ -75,6 +75,9 @@ class PywrHydraImporter:
 
         for group_name, group_id in attribute_group_ids.items():
             for attribute_name, attribute_id in attribute_ids.items():
+                if group_name not in self.data:
+                    continue
+
                 if attribute_name in self.data[group_name]:
                     # If the attribute is in one of the groups / sections of the Pywr data
                     # then we make a group item for it.
@@ -98,7 +101,6 @@ class PywrHydraImporter:
                 resource_scenarios.append(resource_scenario)
 
         for resource_attribute, resource_scenario in self.generate_meta_resource_scenarios(attribute_ids):
-            print(resource_attribute, resource_scenario)
             network_attributes.append(resource_attribute)
             resource_scenarios.append(resource_scenario)
 
