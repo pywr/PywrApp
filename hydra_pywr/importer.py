@@ -1,12 +1,13 @@
 import json
 import warnings
 from past.builtins import basestring
+from .template import PYWR_PROTECTED_NODE_KEYS
 
 
 class PywrHydraImporter:
-    PYWR_PROTECTED_NODE_KEYS = ('name', 'comment')
 
-    def __init__(self, data):
+    def __init__(self, data, template):
+        self.template = template
 
         if isinstance(data, basestring):
             # argument is a filename
@@ -157,7 +158,7 @@ class PywrHydraImporter:
 
         for node in nodes:
             for key in node.keys():
-                if key not in self.PYWR_PROTECTED_NODE_KEYS:
+                if key not in PYWR_PROTECTED_NODE_KEYS:
                     attributes.add(key)
 
         for attr in sorted(attributes):
@@ -206,6 +207,16 @@ class PywrHydraImporter:
             except KeyError:
                 comment = None
 
+            # Get the type for this node from the template
+            # Pywr keeps a registry of lower case node types.
+            pywr_node_type = pywr_node['type'].lower()
+            for template_type in self.template['templatetypes']:
+                if pywr_node_type == template_type['type_name']:
+                    template_type_id = template_type['type_id']
+                    break
+            else:
+                raise ValueError('Template does not contain node of type "{}".'.format(pywr_node_type))
+
             # Now make the attributes
             resource_attributes = []
             for resource_attribute, resource_scenario in self.generate_node_resource_scenarios(pywr_node, attribute_ids):
@@ -220,7 +231,7 @@ class PywrHydraImporter:
                 'x': None,  # TODO add some tests with coordinates.
                 'y': None,
                 'attributes': resource_attributes,
-                # TODO add 'types': [{'id': type_id}, ]
+                'types': [{'id': template_type_id}]
             }
 
             hydra_nodes.append(hydra_node)
@@ -289,7 +300,7 @@ class PywrHydraImporter:
 
         """
         for key in pywr_node.keys():
-            if key in self.PYWR_PROTECTED_NODE_KEYS:
+            if key in PYWR_PROTECTED_NODE_KEYS:
                 continue
             # Non-protected keys represent data that must be added to Hydra.
 

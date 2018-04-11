@@ -8,6 +8,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import datetime
 
+from hydra_pywr.template import generate_pywr_attributes, generate_pywr_template
+
 global user_id
 user_id = config.get('DEFAULT', 'root_user_id', 1)
 
@@ -78,6 +80,24 @@ def session(db, engine, request):
     session.commit()
     # Finally drop all the tables.
     hydra_base.db.DeclarativeBase.metadata.drop_all()
+
+
+@pytest.fixture()
+def session_with_pywr_template(session):
+
+    attributes = [JSONObject(a) for a in generate_pywr_attributes()]
+
+    # The response attributes have ids now.
+    response_attributes = hydra_base.add_attributes(attributes)
+
+    # Convert to a simple dict for local processing.
+    attribute_ids = {a.attr_name: a.attr_id for a in response_attributes}
+
+    template = generate_pywr_template(attribute_ids)
+
+    hydra_base.add_template(JSONObject(template))
+
+    yield session
 
 
 def create_user(name):

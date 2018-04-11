@@ -5,6 +5,13 @@ from pywr.domains.river import *
 from pywr.nodes import NodeMeta
 import pywr
 
+PYWR_PROTECTED_NODE_KEYS = ('name', 'comment', 'type')
+
+
+def pywr_template_name():
+    """ The name of the Hydra template for Pywr. """
+    return 'Pywr template (version: {}, git hash: {})'.format(pywr.__version__, pywr.__git_hash__)
+
 
 def generate_pywr_attributes():
 
@@ -13,6 +20,9 @@ def generate_pywr_attributes():
         schema = node_klass.Schema()
 
         for name, field in schema.fields.items():
+            if name in PYWR_PROTECTED_NODE_KEYS:
+                continue
+
             if name not in attribute_names:
                 yield {
                     'name': name,
@@ -30,6 +40,9 @@ def generate_pywr_node_templates(attribute_ids):
         # Create an attribute for each field in the schema.
         type_attributes = []
         for name, field in schema.fields.items():
+            if name in PYWR_PROTECTED_NODE_KEYS:
+                continue
+
             type_attributes.append({
                 'attr_id': attribute_ids[name],
                 'description': '',
@@ -46,7 +59,8 @@ def generate_pywr_template(attribute_ids):
 
     # TODO add layout
     template = {
-        'name': 'Pywr template (version: {}, git hash: {})'.format(pywr.__version__, pywr.__git_hash__),
+        'name': pywr_template_name(),
         'templatetypes': [t for t in generate_pywr_node_templates(attribute_ids)],
     }
+
     return template

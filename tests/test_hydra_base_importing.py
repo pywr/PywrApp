@@ -5,7 +5,7 @@ from helpers import *
 from fixtures import *
 from hydra_base_fixtures import *
 from hydra_pywr.importer import PywrHydraImporter
-from hydra_pywr.template import generate_pywr_attributes, generate_pywr_template
+from hydra_pywr.template import generate_pywr_attributes, generate_pywr_template, pywr_template_name
 import hydra_base
 import pytest
 import json
@@ -53,10 +53,12 @@ def assert_hydra_pywr(hydra_data, pywr_data):
                 assert_dataset(hydra_data, component_name, component_value, decode_from_json=True)
 
 
-def test_add_network(pywr_json_filename, session, projectmaker, root_user_id):
+def test_add_network(pywr_json_filename, session_with_pywr_template, projectmaker, root_user_id):
     project = projectmaker.create()
 
-    importer = PywrHydraImporter(pywr_json_filename)
+    template = JSONObject(hydra_base.get_template_by_name(pywr_template_name()))
+
+    importer = PywrHydraImporter(pywr_json_filename, template)
 
     # First create the Pywr specific attribute groups.
     attribute_group_ids = {}

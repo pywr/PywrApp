@@ -27,7 +27,8 @@ def pywr_component_data():
 
 @pytest.fixture()
 def pywr_component_importer(pywr_component_data):
-    return PywrHydraImporter({'recorders': pywr_component_data})
+    # Note the use of a fake template here because we're not testing nodes/links.
+    return PywrHydraImporter({'recorders': pywr_component_data}, {'templatetypes': []})
 
 
 @pytest.fixture()

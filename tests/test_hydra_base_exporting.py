@@ -6,10 +6,20 @@ from fixtures import *
 from hydra_base_fixtures import *
 from hydra_pywr.importer import PywrHydraImporter
 from hydra_pywr.exporter import PywrHydraExporter
-from hydra_pywr.template import generate_pywr_attributes, generate_pywr_template
+from hydra_pywr.template import pywr_template_name
 import hydra_base
 import pytest
 import json
+
+
+def assert_identical_pywr_node_data(node1, node2):
+    assert sorted(node1.keys()) == sorted(node2.keys())
+    for node_key in node1.keys():
+        if node_key == 'type':
+            # Types can be upper or lower case
+            assert node1[node_key].lower() == node2[node_key].lower()
+        else:
+            assert node1[node_key] == node2[node_key]
 
 
 def assert_identical_pywr_data(data1, data2):
@@ -19,7 +29,8 @@ def assert_identical_pywr_data(data1, data2):
     for key in data1.keys():
         if key == 'nodes':
             # The ordering of these lists does not matter to Pywr
-            assert sorted(data1[key], key=lambda n: n['name']) == sorted(data2[key], key=lambda n: n['name'])
+            for node1, node2 in zip(sorted(data1[key], key=lambda n: n['name']), sorted(data2[key], key=lambda n: n['name'])):
+                assert_identical_pywr_node_data(node1, node2)
         elif key == 'edges':
             # The ordering of these lists does not matter to Pywr
             assert sorted(data1[key]) == sorted(data2[key])
@@ -28,10 +39,12 @@ def assert_identical_pywr_data(data1, data2):
 
 
 @pytest.fixture()
-def db_with_pywr_network(pywr_json_filename, session, projectmaker, root_user_id):
+def db_with_pywr_network(pywr_json_filename, session_with_pywr_template, projectmaker, root_user_id):
     project = projectmaker.create()
 
-    importer = PywrHydraImporter(pywr_json_filename)
+    template = JSONObject(hydra_base.get_template_by_name(pywr_template_name()))
+
+    importer = PywrHydraImporter(pywr_json_filename, template)
 
     # First create the Pywr specific attribute groups.
     attribute_group_ids = {}
@@ -79,7 +92,10 @@ def test_export(db_with_pywr_network, root_user_id):
     attribute_group_items = hydra_base.get_network_attributegroup_items(pywr_network_id, user_id=root_user_id)
     attribute_group_items = [JSONObject(a) for a in attribute_group_items]
 
-    exporter = PywrHydraExporter(network, attributes, attribute_group_items)
+    # We also need the template to get the node types
+    template = JSONObject(hydra_base.get_template_by_name(pywr_template_name()))
+
+    exporter = PywrHydraExporter(network, attributes, attribute_group_items, template)
 
     pywr_data_exported = exporter.get_pywr_data()
 

@@ -3,10 +3,11 @@ from past.builtins import basestring
 
 
 class PywrHydraExporter:
-    def __init__(self, data, attributes, attribute_group_items):
+    def __init__(self, data, attributes, attribute_group_items, template):
         self.data = data
         self.attributes = attributes
         self.attribute_group_items = attribute_group_items
+        self.template = template
 
     def get_pywr_data(self):
 
@@ -83,10 +84,24 @@ class PywrHydraExporter:
             if node['description'] is not None:
                 pywr_node['comment'] = node['description']
 
+            # Get the type for this node from the template
+            pywr_node_type = None
+            for node_type in node['types']:
+                for template_type in self.template['templatetypes']:
+                    if node_type['type_id'] == template_type['type_id']:
+                        pywr_node_type = template_type['type_name']
+            if pywr_node_type is None:
+                raise ValueError('Template does not contain node of type "{}".'.format(pywr_node_type))
+
+            pywr_node['type'] = pywr_node_type
+
             # Then add any corresponding attributes / data
             for resource_attribute in node['attributes']:
                 attribute = self.attributes[resource_attribute['attr_id']]
-                resource_scenario = self._get_resource_scenario(resource_attribute['resource_attr_id'])
+                try:
+                    resource_scenario = self._get_resource_scenario(resource_attribute['resource_attr_id'])
+                except ValueError:
+                    continue  # No data associated with this attribute.
                 dataset = resource_scenario['dataset']
                 value = dataset['value']
 

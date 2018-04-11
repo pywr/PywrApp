@@ -41,7 +41,8 @@ def pywr_nodes_edges():
 
 @pytest.fixture()
 def pywr_nodes_edges_importer(pywr_nodes_edges):
-    return PywrHydraImporter(pywr_nodes_edges)
+    # Note the use of a fake template here because we're not testing nodes/links.
+    return PywrHydraImporter(pywr_nodes_edges, {'templatetypes': []})
 
 
 def test_nodes_to_attributes(pywr_nodes_edges_importer):
@@ -50,5 +51,9 @@ def test_nodes_to_attributes(pywr_nodes_edges_importer):
     attributes = importer.attributes_from_nodes()
     attribute_names = [a['name'] for a in attributes]
 
-    for key in ('max_flow', 'type', 'cost'):
+    for key in ('max_flow', 'cost'):
         assert key in attribute_names
+
+    for key in ('name', 'comment', 'type'):
+        assert key not in attribute_names
+
