@@ -44,7 +44,7 @@ class PywrHydraImporter:
     def add_attribute_group_request_data(cls, project_id):
         """ Generate the data for adding Pywr specific attribute groups to Hydra. """
 
-        for group_name in ('recorders', 'parameters'):
+        for group_name in ('metadata', 'timestepper', 'recorders', 'parameters'):
             yield {
                 'project_id': project_id,
                 'name': group_name,
@@ -96,13 +96,16 @@ class PywrHydraImporter:
 
         network_attributes = []
         for component_key in ('recorders', 'parameters'):
-            for resource_attribute, resource_scenario in self.generate_component_resource_scenarios(component_key, attribute_ids):
+            generator = self.generate_component_resource_scenarios(component_key, attribute_ids, encode_to_json=True)
+            for resource_attribute, resource_scenario in generator:
                 network_attributes.append(resource_attribute)
                 resource_scenarios.append(resource_scenario)
 
-        for resource_attribute, resource_scenario in self.generate_meta_resource_scenarios(attribute_ids):
-            network_attributes.append(resource_attribute)
-            resource_scenarios.append(resource_scenario)
+        for component_key in ('metadata', 'timestepper'):
+            generator = self.generate_component_resource_scenarios(component_key, attribute_ids, encode_to_json=False)
+            for resource_attribute, resource_scenario in generator:
+                network_attributes.append(resource_attribute)
+                resource_scenarios.append(resource_scenario)
 
         scenario = self.make_scenario(resource_scenarios)
 
@@ -166,11 +169,10 @@ class PywrHydraImporter:
         """ Generator to convert Pywr timestepper data in to Hydra attribute data. """
 
         for meta_key in ('metadata', 'timestepper'):
-            for key, value in self.data[meta_key].items():
+            for key in self.data[meta_key].keys():
                 # Prefix these names with Pywr JSON section.
-                name = '{}_{}'.format(meta_key, key)
                 yield {
-                    'name': name,
+                    'name': key,
                     'dimension': dimension,
                     'description': ''
                 }
@@ -311,7 +313,7 @@ class PywrHydraImporter:
                 'description': ''
             }
 
-    def generate_component_resource_scenarios(self, component_key, attribute_ids, dimension='dimensionless'):
+    def generate_component_resource_scenarios(self, component_key, attribute_ids, **kwargs):
         """ Convert from Pywr components to resource attributes and resource scenarios.
 
         This function is intended to be used to convert Pywr components (e.g. recorders, parameters, etc.)  data
@@ -331,17 +333,5 @@ class PywrHydraImporter:
             # It should have a positive id and already be entered in the hydra database.
             attribute_id = attribute_ids[component_name]
 
-            yield self._make_dataset_resource_attribute_and_scenario(component_name, component_data, attribute_id,
-                                                                     encode_to_json=True, dimension=dimension)
+            yield self._make_dataset_resource_attribute_and_scenario(component_name, component_data, attribute_id, **kwargs)
 
-    def generate_meta_resource_scenarios(self, attribute_ids, dimension='dimensionless'):
-        """ Convert Pywr timestepper data to resource attributes and resource scenarios. """
-
-        for meta_key in ('metadata', 'timestepper'):
-            for key, value in self.data[meta_key].items():
-                # Prefix these names with Pywr JSON section.
-                name = '{}_{}'.format(meta_key, key)
-                attribute_id = attribute_ids[name]
-
-                yield self._make_dataset_resource_attribute_and_scenario(name, value, attribute_id,
-                                                                         encode_to_json=False, dimension=dimension)
