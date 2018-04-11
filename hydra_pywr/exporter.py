@@ -12,6 +12,7 @@ class PywrHydraExporter:
 
         pywr_data = {}
 
+        # TODO see proposed changes to metadata and timestepper data.
         for group_name in ('metadata', 'timestepper', 'recorders', 'parameters'):
             # Recorders and parameters are JSON encoded.
             decode_from_json = group_name in ('recorders', 'parameters')
@@ -125,7 +126,7 @@ class PywrHydraExporter:
                 if group_attribute['id'] == attribute['id']:
                     break
             else:
-                continue  # Filter out keys not associated with meta_keys
+                continue  # Filter out keys not associated the group
 
             resource_scenario = self._get_resource_scenario(resource_attribute['resource_attr_id'])
             dataset = resource_scenario['dataset']
@@ -134,6 +135,7 @@ class PywrHydraExporter:
             if decode_from_json:
                 value = json.loads(value)
 
+            # TODO check this. It should not happen as described below.
             # Hydra opportunistically converts everything to native types
             # Some of the Pywr data should remain as string despite looking like a float/int
             if attribute_name == 'minimum_version' and group_name == 'metadata':

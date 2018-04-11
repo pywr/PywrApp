@@ -90,7 +90,7 @@ class PywrHydraImporter:
     def add_network_request_data(self, attribute_ids, project_id, projection=None):
         """ Return a dictionary of the data required for adding a network to Hydra. """
 
-        # TODO add additional metadata
+        # TODO add tables and scenarios.
 
         nodes, links, resource_scenarios = self.convert_nodes_and_edges(attribute_ids)
 
@@ -101,6 +101,8 @@ class PywrHydraImporter:
                 network_attributes.append(resource_attribute)
                 resource_scenarios.append(resource_scenario)
 
+        # TODO name and description are added to network data
+        # TODO timestepper data is on the scenario.
         for component_key in ('metadata', 'timestepper'):
             generator = self.generate_component_resource_scenarios(component_key, attribute_ids, encode_to_json=False)
             for resource_attribute, resource_scenario in generator:
@@ -119,7 +121,7 @@ class PywrHydraImporter:
             "scenarios": [scenario, ],
             "projection": projection,
             "attributes": network_attributes,
-            "types": [],
+            "types": [],  # TODO add type summary.
         }
         return data
 
@@ -132,8 +134,8 @@ class PywrHydraImporter:
         timestepper = self.data['timestepper']
 
         scenario = {
-            "name": "",
-            "description": "",
+            "name": "",  # TODO give this a name
+            "description": "",  # TODO give this a description
             "start_time": timestepper['start'],
             "end_time": timestepper['end'],
             "time_step": str(timestepper['timestep']),
@@ -189,6 +191,7 @@ class PywrHydraImporter:
                     return hydra_node['id']
             raise ValueError('Node name "{}" not found in node data.'.format(node_name))
 
+        # TODO make this object properties
         node_id = -1
         link_id = -1
         hydra_nodes = []
@@ -213,10 +216,11 @@ class PywrHydraImporter:
                 'id': node_id,
                 'name': pywr_node['name'],
                 'description': comment,
-                'layout': None,
-                'x': None,
+                'layout': None,  # TODO this is a JSON string
+                'x': None,  # TODO add some tests with coordinates.
                 'y': None,
                 'attributes': resource_attributes,
+                # TODO add 'types': [{'id': type_id}, ]
             }
 
             hydra_nodes.append(hydra_node)
@@ -238,6 +242,7 @@ class PywrHydraImporter:
                 'node_1_id': find_node_id(node_1_name),
                 'node_2_id': find_node_id(node_2_name),
                 'attributes': [],  # Links have no resource attributes
+                # TODO add 'types': [{'id': type_id}, ]
             }
             hydra_links.append(hydra_link)
             link_id -= 1
@@ -256,10 +261,10 @@ class PywrHydraImporter:
             'name': name,
             'value': json.dumps(value) if encode_to_json else value,
             "hidden": "N",
-            "type": "descriptor",
+            "type": "descriptor",  # TODO make this dependent on the value (i.e. scalar if int or float)
             "dimension": dimension,
             "unit": "-",
-            "metadata": "{}"
+            "metadata": "{}"  # TODO add metadata storing whether JSON encoded or not.
         }
 
         # Create a resource scenario linking the dataset to the scenario
@@ -276,7 +281,7 @@ class PywrHydraImporter:
             'attr_is_var': 'N'
         }
 
-        # Finally add the resource attribute to the hydra node data
+        # Finally return resource attribute and resource scenario
         return resource_attribute, resource_scenario
 
     def generate_node_resource_scenarios(self, pywr_node, attribute_ids, dimension='dimensionless'):

@@ -71,6 +71,7 @@ def test_add_network(pywr_json_filename, session, projectmaker, root_user_id):
     response_attributes = hydra_base.add_attributes(attributes)
 
     # Convert to a simple dict for local processing.
+    # TODO change this variable name to map or lookup
     attribute_ids = {a.attr_name: a.attr_id for a in response_attributes}
 
     # Now we try to create the network

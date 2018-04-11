@@ -71,13 +71,13 @@ def test_export(db_with_pywr_network, root_user_id):
     # Fetch all the attributes
     attributes = hydra_base.get_attributes()
     # TODO not sure why this returns SQLAlchemy object?
+    # TODO rename this to map/lookup
     attributes = {attr.attr_id: JSONObject(attr) for attr in attributes}
 
     # Fetch all the attribute group items for this network
+    # TODO rename this to map/lookup
     attribute_group_items = hydra_base.get_network_attributegroup_items(pywr_network_id, user_id=root_user_id)
     attribute_group_items = [JSONObject(a) for a in attribute_group_items]
-
-    print(type(network))
 
     exporter = PywrHydraExporter(network, attributes, attribute_group_items)
 
