@@ -180,6 +180,14 @@ class PywrHydraImporter:
                     'description': ''
                 }
 
+    def _get_template_type_by_name(self, name, resource_type=None):
+        for template_type in self.template['templatetypes']:
+            if name == template_type['type_name']:
+                if resource_type is None or template_type['resource_type'] == resource_type:
+                    return template_type
+
+        raise ValueError('Template does not contain node of type "{}".'.format(name))
+
     def convert_nodes_and_edges(self, attribute_ids):
         """ Convert a tuple of (nodes, links) of Hydra data based on the given Pywr data. """
 
@@ -210,12 +218,8 @@ class PywrHydraImporter:
             # Get the type for this node from the template
             # Pywr keeps a registry of lower case node types.
             pywr_node_type = pywr_node['type'].lower()
-            for template_type in self.template['templatetypes']:
-                if pywr_node_type == template_type['type_name']:
-                    template_type_id = template_type['type_id']
-                    break
-            else:
-                raise ValueError('Template does not contain node of type "{}".'.format(pywr_node_type))
+            node_template_type = self._get_template_type_by_name(pywr_node_type, 'NODE')
+            node_template_type_id = node_template_type['type_id']
 
             # Now make the attributes
             resource_attributes = []
@@ -231,11 +235,15 @@ class PywrHydraImporter:
                 'x': None,  # TODO add some tests with coordinates.
                 'y': None,
                 'attributes': resource_attributes,
-                'types': [{'id': template_type_id}]
+                'types': [{'id': node_template_type_id}]
             }
 
             hydra_nodes.append(hydra_node)
             node_id -= 1
+
+        # All Pywr edges have the same type
+        edge_template_type = self._get_template_type_by_name('edge', 'LINK')
+        edge_template_type_id = edge_template_type['type_id']
 
         for pywr_edge in pywr_edges:
 
@@ -253,7 +261,7 @@ class PywrHydraImporter:
                 'node_1_id': find_node_id(node_1_name),
                 'node_2_id': find_node_id(node_2_name),
                 'attributes': [],  # Links have no resource attributes
-                # TODO add 'types': [{'id': type_id}, ]
+                'types': [{'id': edge_template_type_id}]
             }
             hydra_links.append(hydra_link)
             link_id -= 1

@@ -57,10 +57,21 @@ def generate_pywr_node_templates(attribute_ids):
 
 def generate_pywr_template(attribute_ids):
 
+    template_types = [
+        {
+            'name': 'edge',
+            'resource_type': 'LINK',
+            'typeattrs': []
+        }
+    ]
+
+    for t in generate_pywr_node_templates(attribute_ids):
+        template_types.append(t)
+
     # TODO add layout
     template = {
         'name': pywr_template_name(),
-        'templatetypes': [t for t in generate_pywr_node_templates(attribute_ids)],
+        'templatetypes': template_types,
     }
 
     return template
