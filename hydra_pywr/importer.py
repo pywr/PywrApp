@@ -275,7 +275,7 @@ class PywrHydraImporter:
             "type": "descriptor",  # TODO make this dependent on the value (i.e. scalar if int or float)
             "dimension": dimension,
             "unit": "-",
-            "metadata": "{}"  # TODO add metadata storing whether JSON encoded or not.
+            "metadata": json.dumps({'json_encoded': encode_to_json})
         }
 
         # Create a resource scenario linking the dataset to the scenario
