@@ -80,11 +80,9 @@ def test_components_to_datasets(pywr_component_importer, hydra_attribute_ids):
 
     resource_attributes = []
     resource_scenarios = []
-    for ra, rs in importer.generate_component_resource_scenarios('recorders', hydra_attribute_ids,
-                                                   dimension='recorder'):
+    for ra, rs in importer.generate_component_resource_scenarios('recorders', hydra_attribute_ids, encode_to_json=True):
         resource_scenarios.append(rs)
         resource_attributes.append(ra)
-
 
     # There should be one resource attribute and scenario dataset for each component
     assert len(resource_attributes) == len(resource_scenarios) == len(importer.data['recorders']) == len(hydra_attribute_ids)
