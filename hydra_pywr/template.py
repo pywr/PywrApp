@@ -62,6 +62,11 @@ def generate_pywr_template(attribute_ids):
             'name': 'edge',
             'resource_type': 'LINK',
             'typeattrs': []
+        },
+        {
+            'name': 'pywr',
+            'resource_type': 'NETWORK',
+            'typeattrs': []  # TODO add default network attributes
         }
     ]
 

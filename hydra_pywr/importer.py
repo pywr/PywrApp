@@ -91,6 +91,10 @@ class PywrHydraImporter:
     def add_network_request_data(self, attribute_ids, project_id, projection=None):
         """ Return a dictionary of the data required for adding a network to Hydra. """
 
+        # Get the network type
+        network_template_type = self._get_template_type_by_name('pywr', 'NETWORK')
+        network_template_type_id = network_template_type['type_id']
+
         # TODO add tables and scenarios.
 
         nodes, links, resource_scenarios = self.convert_nodes_and_edges(attribute_ids)
@@ -122,7 +126,7 @@ class PywrHydraImporter:
             "scenarios": [scenario, ],
             "projection": projection,
             "attributes": network_attributes,
-            "types": [],  # TODO add type summary.
+            'types': [{'id': network_template_type_id}]
         }
         return data
 
