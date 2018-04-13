@@ -10,7 +10,7 @@ PYWR_PROTECTED_NODE_KEYS = ('name', 'comment', 'type')
 
 def pywr_template_name():
     """ The name of the Hydra template for Pywr. """
-    return 'Pywr template (version: {}, git hash: {})'.format(pywr.__version__, pywr.__git_hash__)
+    return 'Pywr template (version: {}, git hash: {})'.format(pywr.__version__, pywr.__git_hash__[:6])
 
 
 def generate_pywr_attributes():
