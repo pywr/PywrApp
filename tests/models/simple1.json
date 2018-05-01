@@ -13,7 +13,17 @@
         {
             "name": "supply1",
             "type": "Input",
-            "max_flow": 15
+            "max_flow": 15,
+            "position": {
+                "geographic": [
+                    499490.08851714735,
+                    199510.0485933599
+                ],
+                "schematic": [
+                    -20.422073680981352,
+                    -30.063849189618615
+                ]
+            }
         },
         {
             "name": "link1",

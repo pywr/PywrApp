@@ -37,6 +37,17 @@ def assert_hydra_pywr(hydra_data, pywr_data):
     assert len(hydra_data['nodes']) == len(pywr_data['nodes'])
     assert len(hydra_data['links']) == len(pywr_data['edges'])
 
+    # Check coordinates
+    for pywr_node in pywr_data['nodes']:
+        for hydra_node in hydra_data['nodes']:
+            if pywr_node['name'] == hydra_node['name']:
+                try:
+                    pywr_coordinate = pywr_node['position']['geographic']
+                except KeyError:
+                    pass
+                else:
+                    assert pywr_coordinate == [hydra_node['y'], hydra_node['x']]
+
     # Ensure that the time-stepper information exists.
     timestepper = pywr_data['timestepper']
     for key, value in timestepper.items():
