@@ -231,13 +231,20 @@ class PywrHydraImporter:
                 resource_attributes.append(resource_attribute)
                 hydra_resource_scenarios.append(resource_scenario)
 
+            # Try to get a coordinate from the pywr_node
+            x, y = None, None
+            try:
+                y, x = pywr_node['position']['geographic']
+            except KeyError:
+                pass
+
             hydra_node = {
                 'id': node_id,
                 'name': pywr_node['name'],
                 'description': comment,
                 'layout': None,  # TODO this is a JSON string
-                'x': None,  # TODO add some tests with coordinates.
-                'y': None,
+                'x': x,  # TODO add some tests with coordinates.
+                'y': y,
                 'attributes': resource_attributes,
                 'types': [{'id': node_template_type_id}]
             }
