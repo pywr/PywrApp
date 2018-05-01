@@ -46,7 +46,7 @@ def assert_hydra_pywr(hydra_data, pywr_data):
                 except KeyError:
                     pass
                 else:
-                    assert pywr_coordinate == [hydra_node['y'], hydra_node['x']]
+                    assert pywr_coordinate == [hydra_node['x'], hydra_node['y']]
 
     # Ensure that the time-stepper information exists.
     timestepper = pywr_data['timestepper']

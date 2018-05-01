@@ -234,7 +234,7 @@ class PywrHydraImporter:
             # Try to get a coordinate from the pywr_node
             x, y = None, None
             try:
-                y, x = pywr_node['position']['geographic']
+                x, y = pywr_node['position']['geographic']
             except KeyError:
                 pass
 
