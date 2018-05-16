@@ -3,6 +3,8 @@ import warnings
 from past.builtins import basestring
 from .template import PYWR_PROTECTED_NODE_KEYS
 
+import logging
+log = logging.getLogger(__name__)
 
 class PywrHydraImporter:
 
@@ -93,7 +95,7 @@ class PywrHydraImporter:
 
         # Get the network type
         network_template_type = self._get_template_type_by_name('pywr', 'NETWORK')
-        network_template_type_id = network_template_type['type_id']
+        network_template_type_id = network_template_type['id']
 
         # TODO add tables and scenarios.
 
@@ -186,7 +188,7 @@ class PywrHydraImporter:
 
     def _get_template_type_by_name(self, name, resource_type=None):
         for template_type in self.template['templatetypes']:
-            if name == template_type['type_name']:
+            if name == template_type['name']:
                 if resource_type is None or template_type['resource_type'] == resource_type:
                     return template_type
 
@@ -223,7 +225,7 @@ class PywrHydraImporter:
             # Pywr keeps a registry of lower case node types.
             pywr_node_type = pywr_node['type'].lower()
             node_template_type = self._get_template_type_by_name(pywr_node_type, 'NODE')
-            node_template_type_id = node_template_type['type_id']
+            node_template_type_id = node_template_type['id']
 
             # Now make the attributes
             resource_attributes = []
@@ -254,7 +256,7 @@ class PywrHydraImporter:
 
         # All Pywr edges have the same type
         edge_template_type = self._get_template_type_by_name('edge', 'LINK')
-        edge_template_type_id = edge_template_type['type_id']
+        edge_template_type_id = edge_template_type['id']
 
         for pywr_edge in pywr_edges:
 
