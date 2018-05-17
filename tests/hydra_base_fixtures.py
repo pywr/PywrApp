@@ -90,7 +90,7 @@ def session_with_pywr_template(session):
     response_attributes = hydra_base.add_attributes(attributes)
 
     # Convert to a simple dict for local processing.
-    attribute_ids = {a.attr_name: a.attr_id for a in response_attributes}
+    attribute_ids = {a.name: a.id for a in response_attributes}
 
     template = generate_pywr_template(attribute_ids)
 
@@ -133,13 +133,13 @@ def projectmaker():
 
 
 def create_project(name=None):
+
     if name is None:
         name = "Unittest Project"
 
-    try:
-        p = JSONObject(hydra_base.get_project_by_name(name, user_id=user_id))
-        return p
-    except Exception:
+    user_projects = hydra_base.get_project_by_name(name, user_id=user_id)
+
+    if len(user_projects) == 0:
         project = JSONObject()
         project.name = name
         project.description = "Project which contains all unit test networks"
@@ -151,6 +151,8 @@ def create_project(name=None):
                                  user_id=user_id)
 
         return project
+    else:
+        return user_projects[0]
 
 @pytest.fixture()
 def root_user_id():

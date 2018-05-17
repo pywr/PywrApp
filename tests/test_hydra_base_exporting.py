@@ -59,7 +59,7 @@ def db_with_pywr_network(pywr_json_filename, session_with_pywr_template, project
     response_attributes = hydra_base.add_attributes(attributes)
 
     # Convert to a simple dict for local processing.
-    attribute_ids = {a.attr_name: a.attr_id for a in response_attributes}
+    attribute_ids = {a.name: a.id for a in response_attributes}
 
     # Now we try to create the network
     network = importer.add_network_request_data(attribute_ids, project.id)
@@ -85,17 +85,22 @@ def test_export(db_with_pywr_network, root_user_id):
     attributes = hydra_base.get_attributes()
     # TODO not sure why this returns SQLAlchemy object?
     # TODO rename this to map/lookup
-    attributes = {attr.attr_id: JSONObject(attr) for attr in attributes}
+    attributes = {attr.id: JSONObject(attr) for attr in attributes}
 
     # Fetch all the attribute group items for this network
     # TODO rename this to map/lookup
-    attribute_group_items = hydra_base.get_network_attributegroup_items(pywr_network_id, user_id=root_user_id)
-    attribute_group_items = [JSONObject(a) for a in attribute_group_items]
+    attribute_group_items_i = hydra_base.get_network_attributegroup_items(pywr_network_id, user_id=root_user_id)
+    attribute_group_items_j = [JSONObject(a) for a in attribute_group_items_i]
+
+    # TODO this can be removed when JSONObject is fixed to load the group data from within the group item.
+    for attribute_group_item_i, attribute_group_item_j in zip(attribute_group_items_i, attribute_group_items_j):
+        group_j = JSONObject(attribute_group_item_i.group)
+        attribute_group_item_j.group = group_j
 
     # We also need the template to get the node types
     template = JSONObject(hydra_base.get_template_by_name(pywr_template_name()))
 
-    exporter = PywrHydraExporter(network, attributes, attribute_group_items, template)
+    exporter = PywrHydraExporter(network, attributes, attribute_group_items_j, template)
 
     pywr_data_exported = exporter.get_pywr_data()
 

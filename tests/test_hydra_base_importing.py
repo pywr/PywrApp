@@ -16,7 +16,7 @@ def assert_dataset(hydra_data, key, value, decode_from_json=False):
 
     for scenario in hydra_data['scenarios']:
         for rs in scenario['resourcescenarios']:
-            hydra_value = rs['value']['value']
+            hydra_value = rs['dataset']['value']
             if decode_from_json:
                 # The data in hydra is stored as a JSON encoded string.
                 # Load it back to Python types for comparison with Pywr data.
@@ -85,7 +85,7 @@ def test_add_network(pywr_json_filename, session_with_pywr_template, projectmake
 
     # Convert to a simple dict for local processing.
     # TODO change this variable name to map or lookup
-    attribute_ids = {a.attr_name: a.attr_id for a in response_attributes}
+    attribute_ids = {a.name: a.id for a in response_attributes}
 
     # Now we try to create the network
     network = importer.add_network_request_data(attribute_ids, project.id)
@@ -115,7 +115,7 @@ def test_add_template(session, root_user_id):
     response_attributes = hydra_base.add_attributes(attributes)
 
     # Convert to a simple dict for local processing.
-    attribute_ids = {a.attr_name: a.attr_id for a in response_attributes}
+    attribute_ids = {a.name: a.id for a in response_attributes}
 
     template = generate_pywr_template(attribute_ids)
 

@@ -303,7 +303,7 @@ class PywrHydraImporter:
         resource_scenario = {
             'resource_attr_id': resource_attribute_id,
             'attr_id': attribute_id,
-            'value': dataset
+            'dataset': dataset
         }
 
         # Create a resource attribute linking the resource scenario to the node

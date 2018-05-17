@@ -81,15 +81,15 @@ class PywrHydraExporter:
             # Create the basic information.
             pywr_node = {'name': node['name']}
 
-            if node['description'] is not None:
+            if node.get('description', None) is not None:
                 pywr_node['comment'] = node['description']
 
             # Get the type for this node from the template
             pywr_node_type = None
             for node_type in node['types']:
                 for template_type in self.template['templatetypes']:
-                    if node_type['type_id'] == template_type['type_id']:
-                        pywr_node_type = template_type['type_name']
+                    if node_type['id'] == template_type['id']:
+                        pywr_node_type = template_type['name']
             if pywr_node_type is None:
                 raise ValueError('Template does not contain node of type "{}".'.format(pywr_node_type))
 
@@ -99,7 +99,7 @@ class PywrHydraExporter:
             for resource_attribute in node['attributes']:
                 attribute = self.attributes[resource_attribute['attr_id']]
                 try:
-                    resource_scenario = self._get_resource_scenario(resource_attribute['resource_attr_id'])
+                    resource_scenario = self._get_resource_scenario(resource_attribute['id'])
                 except ValueError:
                     continue  # No data associated with this attribute.
                 dataset = resource_scenario['dataset']
@@ -143,7 +143,7 @@ class PywrHydraExporter:
             else:
                 continue  # Filter out keys not associated the group
 
-            resource_scenario = self._get_resource_scenario(resource_attribute['resource_attr_id'])
+            resource_scenario = self._get_resource_scenario(resource_attribute['id'])
             dataset = resource_scenario['dataset']
             value = dataset['value']
 
@@ -153,8 +153,8 @@ class PywrHydraExporter:
             # TODO check this. It should not happen as described below.
             # Hydra opportunistically converts everything to native types
             # Some of the Pywr data should remain as string despite looking like a float/int
-            if attribute_name == 'minimum_version' and group_name == 'metadata':
-                value = str(value)
+            if attribute_name == 'timestep' and group_name == 'timestepper':
+                value = int(value)
 
             yield attribute_name, value
 

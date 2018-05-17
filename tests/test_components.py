@@ -120,7 +120,7 @@ def test_components_to_datasets(pywr_component_importer, hydra_attribute_ids):
             raise ValueError('No attributes with id "{}" found.'.format(data['attr_id']))
 
         # The dataset should be encoded in the "value" key of resource scenario
-        dataset_data = data['value']
+        dataset_data = data['dataset']
 
         dataset_data['type'] = 'descriptor'
         dataset_data['dimension'] = 'recorder'
