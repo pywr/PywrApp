@@ -29,7 +29,7 @@ class PywrHydraImporter:
     @property
     def name(self):
         try:
-            name = self.data['metadata']['name']
+            name = self.data['metadata']['title']
         except KeyError:
             name = 'A Pywr model.'
             warnings.warn('Pywr model data contains no name metadata. Using default name: "{}"'.format(name))
