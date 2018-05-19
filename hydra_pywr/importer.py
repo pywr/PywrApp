@@ -1,10 +1,11 @@
 import json
 import warnings
 from past.builtins import basestring
-from .template import PYWR_PROTECTED_NODE_KEYS
+from .template import PYWR_PROTECTED_NODE_KEYS, pywr_template_name
 
 import logging
 log = logging.getLogger(__name__)
+
 
 class PywrHydraImporter:
 
@@ -25,6 +26,11 @@ class PywrHydraImporter:
         # Default internal variables
         self.next_resource_attribute_id = -1
         self.next_node_id = -1
+
+    @classmethod
+    def from_client(cls, client, data):
+        template = client.get_template_by_name(pywr_template_name())
+        return cls(data, template)
 
     @property
     def name(self):
@@ -54,6 +60,35 @@ class PywrHydraImporter:
                 'description': "Pywr {} data.".format(group_name),
                 'exclusive': 'Y',
             }
+
+    def import_data(self, client, project_id):
+
+        # First create the Pywr specific attribute groups.
+        attribute_group_ids = {}
+        for group_data in self.add_attribute_group_request_data(project_id):
+            response_group = client.add_attribute_group(group_data)
+            attribute_group_ids[group_data['name']] = response_group.id
+
+        # First the attributes must be added.
+        attributes = self.add_attributes_request_data()
+
+        # The response attributes have ids now.
+        response_attributes = client.add_attributes(attributes)
+
+        # Convert to a simple dict for local processing.
+        # TODO change this variable name to map or lookup
+        attribute_ids = {a.name: a.id for a in response_attributes}
+
+        # Now we try to create the network
+        network = self.add_network_request_data(attribute_ids, project_id)
+
+        hydra_network = client.add_network(network)
+
+        # Now we have to add the attribute group items
+        attribute_group_items = self.add_attribute_group_items_request_data(attribute_ids, attribute_group_ids,
+                                                                                hydra_network.id)
+
+        client.add_attribute_group_items(attribute_group_items)
 
     def add_attributes_request_data(self):
         """ Generate the data for adding attributes to Hydra. """

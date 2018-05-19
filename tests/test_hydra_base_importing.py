@@ -42,10 +42,7 @@ def test_add_network(pywr_json_filename, session_with_pywr_template, projectmake
         pywr_data = json.load(fh)
 
     assert_hydra_pywr(network, pywr_data)
-
-    json_network = convert_network_to_json_object(network)
-
-    hydra_network = hydra_base.add_network(json_network, user_id=root_user_id)
+    hydra_network = hydra_base.add_network(JSONObject(network), user_id=root_user_id)
 
     # Now we have to add the attribute group items
     attribute_group_items = importer.add_attribute_group_items_request_data(attribute_ids, attribute_group_ids,

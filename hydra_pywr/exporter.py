@@ -1,5 +1,6 @@
 import json
 from past.builtins import basestring
+from .template import pywr_template_name
 
 
 class PywrHydraExporter:
@@ -8,6 +9,27 @@ class PywrHydraExporter:
         self.attributes = attributes
         self.attribute_group_items = attribute_group_items
         self.template = template
+
+    @classmethod
+    def from_network_id(cls, client, network_id):
+        # Fetch the network
+        network = client.get_network(network_id, include_data='Y')
+        # Fetch all the attributes
+        attributes = client.get_attributes()
+        attributes = {attr.id: attr for attr in attributes}
+
+        # Fetch all the attribute group items for this network
+        attribute_group_items = client.get_network_attributegroup_items(network_id)
+
+        # # TODO this can be removed when JSONObject is fixed to load the group data from within the group item.
+        for attribute_group_item in attribute_group_items:
+            group = client.get_attribute_group(attribute_group_item['group_id'])
+            assert group['id'] == attribute_group_item['group_id']
+            attribute_group_item['group'] = group
+
+        # We also need the template to get the node types
+        template = client.get_template_by_name(pywr_template_name())
+        return cls(network, attributes, attribute_group_items, template)
 
     def get_pywr_data(self):
 

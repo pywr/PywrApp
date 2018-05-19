@@ -1,0 +1,90 @@
+import click
+import os
+import json
+from hydra_client.connection import JSONConnection
+from .exporter import PywrHydraExporter
+from .runner import PywrHydraRunner
+from .importer import PywrHydraImporter
+from .util import make_plugins
+
+
+# TODO replace with a generic client loader from hydra_client
+def get_client():
+    return JSONConnection(app_name='Pywr Hydra App')
+
+
+def start_cli():
+    cli(obj={})
+
+
+@click.group()
+@click.pass_obj
+def cli(obj):
+    """ CLI for the Pywr-Hydra application. """
+    obj['client'] = get_client()
+
+
+@cli.command(name='import')
+@click.pass_obj
+@click.argument('filename', type=click.Path(file_okay=True, dir_okay=False, exists=True))
+@click.option('-p', '--project-id', type=int, default=None)
+def import_json(obj, filename, project_id):
+    """ Import a Pywr JSON file into Hydra. """
+    client = obj['client']
+    importer = PywrHydraImporter.from_client(client, filename)
+    importer.import_data(client, project_id)
+
+
+@cli.command(name='export')
+@click.pass_obj
+@click.argument('filename', type=click.Path(file_okay=True, dir_okay=False))
+@click.option('-n', '--network-id', type=int, default=None)
+@click.option('--json-indent', type=int, default=2)
+@click.option('--json-sort-keys', type=int, default=True)
+def export_json(obj, filename, network_id, sort_keys, indent):
+    """ Export a Pywr JSON from Hydra. """
+    client = obj['client']
+    exporter = PywrHydraExporter.from_network_id(client, network_id)
+
+    with open(filename, mode='w') as fh:
+        json.dump(exporter.get_pywr_data(), fh, sort_keys=sort_keys, indent=indent)
+
+
+@cli.command()
+@click.pass_obj
+@click.option('-n', '--network-id', type=int, default=None)
+def run(obj, network_id):
+    """ Export, run and save a Pywr model from Hydra. """
+
+    client = obj['client']
+    runner = PywrHydraRunner.from_network_id(client, network_id)
+
+    runner.load_pywr_model()
+
+    runner.run_pywr_model()
+
+    runner.save_pywr_results()
+
+
+@cli.command()
+@click.pass_obj
+def register(obj):
+    """ Register the app with the Hydra installation. """
+    import hydra_base
+
+    plugins = make_plugins(cli)
+
+    base_plugin_dir = hydra_base.config.get('plugin', 'default_directory')
+
+    if not os.path.exists(base_plugin_dir):
+        os.mkdir(base_plugin_dir)
+
+    for name, element_tree in plugins:
+        plugin_path = os.path.join(base_plugin_dir, name)
+
+        if not os.path.exists(plugin_path):
+            os.mkdir(plugin_path)
+
+        with open(os.path.join(plugin_path, 'plugin.xml'), 'w') as fh:
+            element_tree.write(fh, encoding="unicode")
+

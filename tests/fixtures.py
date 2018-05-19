@@ -1,7 +1,6 @@
 import os
 import pytest
 import hydra_base
-from helpers import convert_network_to_json_object
 from hydra_base import JSONObject
 from hydra_pywr.importer import PywrHydraImporter
 from hydra_pywr.template import pywr_template_name
@@ -61,14 +60,10 @@ def db_with_pywr_network(pywr_json_filename, session_with_pywr_template, project
 
     # Convert to a simple dict for local processing.
     attribute_ids = {a.name: a.id for a in response_attributes}
-    for n, i in sorted(attribute_ids.items()):
-        print(n, i)
 
     # Now we try to create the network
     network = importer.add_network_request_data(attribute_ids, project.id)
-    json_network = convert_network_to_json_object(network)
-
-    hydra_network = hydra_base.add_network(json_network, user_id=root_user_id)
+    hydra_network = hydra_base.add_network(JSONObject(network), user_id=root_user_id)
 
     # Now we have to add the attribute group items
     attribute_group_items = importer.add_attribute_group_items_request_data(attribute_ids, attribute_group_ids,

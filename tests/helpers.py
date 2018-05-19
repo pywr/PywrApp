@@ -2,17 +2,6 @@ import json
 from hydra_base.lib.objects import JSONObject, Dataset
 
 
-# TODO this can be removed in latest refactor branch
-def convert_network_to_json_object(network):
-
-    json_network = JSONObject(network)
-    for scenario in json_network['scenarios']:
-        for rs in scenario['resourcescenarios']:
-            rs.dataset = Dataset(rs['dataset'])
-
-    return json_network
-
-
 def assert_dataset(hydra_data, key, value, decode_from_json=False):
     """ Raise an assertion error if the value is not found as a resource scenario's dataset. """
 
