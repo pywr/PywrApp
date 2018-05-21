@@ -20,10 +20,10 @@ def make_plugin(command):
 
     return {
         'plugin_name': command.short_help,
-        'plugin_dir': 'hydra-pywr {}'.format(command.name),
+        'plugin_dir': '',
         'plugin_description': command.help,
         'plugin_category': 'import',
-        'plugin_command': 'hydra-pywr {}'.format(command.name),
+        'plugin_command': 'run.sh {}'.format(command.name),
         'plugin_shell': 'bash',
         'plugin_location': '.',
         'plugin_nativelogextension': '.log',
@@ -40,7 +40,7 @@ def make_plugin(command):
 def make_args(command, required=True):
     """ Generate argument definitions for each parameter in command. """
     for param in command.params:
-        if not isinstance(param, click.Argument):
+        if not isinstance(param, (click.Argument, click.Option)):
             continue
 
         if param.required != required:
@@ -48,6 +48,7 @@ def make_args(command, required=True):
 
         yield {
             'name': param.name,
+            'switch': '--' + param.name.replace('_', '-'),
             'multiple': 'Y' if param.multiple else 'N',
             #'argtype': param.type
         }
@@ -60,7 +61,7 @@ def plugin_to_xml(data):
     for key, value in data.items():
         e = ET.SubElement(root, key, )
 
-        if key == 'mandatory_args':
+        if key in ('mandatory_args', 'non_mandatory_args'):
             for arg in value:
                 arg_element = ET.SubElement(e, 'arg')
                 for arg_key, arg_value in arg.items():

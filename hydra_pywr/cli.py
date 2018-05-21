@@ -53,7 +53,8 @@ def export_json(obj, filename, network_id, sort_keys, indent):
 @cli.command()
 @click.pass_obj
 @click.option('-n', '--network-id', type=int, default=None)
-def run(obj, network_id):
+@click.option('-s', '--scenario-id', type=int, default=None)
+def run(obj, network_id, scenario_id):
     """ Export, run and save a Pywr model from Hydra. """
 
     client = obj['client']
@@ -76,15 +77,27 @@ def register(obj):
 
     base_plugin_dir = hydra_base.config.get('plugin', 'default_directory')
 
+    base_plugin_dir = os.path.join(base_plugin_dir, 'PywrApp')
+
     if not os.path.exists(base_plugin_dir):
         os.mkdir(base_plugin_dir)
 
     for name, element_tree in plugins:
         plugin_path = os.path.join(base_plugin_dir, name)
 
+        if name == 'register':
+            continue  # Don't register this command
+
         if not os.path.exists(plugin_path):
             os.mkdir(plugin_path)
 
         with open(os.path.join(plugin_path, 'plugin.xml'), 'w') as fh:
             element_tree.write(fh, encoding="unicode")
+
+        # We also need to write a very basic script to run the command
+        with open(os.path.join(plugin_path, 'run.sh'), 'w') as fh:
+            fh.writelines([
+                '"# !/bin/bash',
+                'hydra-pywr "$@"',
+            ])
 
