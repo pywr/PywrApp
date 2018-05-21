@@ -80,3 +80,18 @@ def generate_pywr_template(attribute_ids):
     }
 
     return template
+
+
+def register_template(client):
+    """ Register the template with Hydra. """
+    attributes = [a for a in generate_pywr_attributes()]
+
+    # The response attributes have ids now.
+    response_attributes = client.add_attributes(attributes)
+
+    # Convert to a simple dict for local processing.
+    attribute_ids = {a.name: a.id for a in response_attributes}
+
+    template = generate_pywr_template(attribute_ids)
+
+    client.add_template(template)

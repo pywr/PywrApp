@@ -6,6 +6,7 @@ from .exporter import PywrHydraExporter
 from .runner import PywrHydraRunner
 from .importer import PywrHydraImporter
 from .util import make_plugins
+from .template import register_template
 
 
 # TODO replace with a generic client loader from hydra_client
@@ -101,3 +102,16 @@ def register(obj):
                 'hydra-pywr "$@"',
             ])
 
+
+@cli.group()
+def template():
+    pass
+
+
+@template.command('register')
+@click.pass_obj
+def template_register(obj):
+    """ Register a Pywr template with Hydra. """
+
+    client = obj['client']
+    register_template(client)
