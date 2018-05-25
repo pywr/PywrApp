@@ -28,7 +28,7 @@ def cli(obj):
 @cli.command(name='import')
 @click.pass_obj
 @click.argument('filename', type=click.Path(file_okay=True, dir_okay=False, exists=True))
-@click.option('-p', '--project-id', type=int, default=None)
+@click.argument('project_id', type=int)
 def import_json(obj, filename, project_id):
     """ Import a Pywr JSON file into Hydra. """
     client = obj['client']
