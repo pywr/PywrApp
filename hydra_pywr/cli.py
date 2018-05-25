@@ -92,8 +92,8 @@ def register(obj):
         if not os.path.exists(plugin_path):
             os.mkdir(plugin_path)
 
-        with open(os.path.join(plugin_path, 'plugin.xml'), 'w') as fh:
-            element_tree.write(fh, encoding="unicode")
+        with open(os.path.join(plugin_path, 'plugin.xml'), 'wb') as fh:
+            element_tree.write(fh, encoding="utf8")
 
         # We also need to write a very basic script to run the command
         with open(os.path.join(plugin_path, 'run.sh'), 'w') as fh:
