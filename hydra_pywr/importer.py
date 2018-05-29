@@ -90,6 +90,8 @@ class PywrHydraImporter:
 
         client.add_attribute_group_items(attribute_group_items)
 
+        return hydra_network.id
+
     def add_attributes_request_data(self):
         """ Generate the data for adding attributes to Hydra. """
 
