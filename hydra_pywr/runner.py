@@ -7,7 +7,7 @@ from pywr.recorders.progress import ProgressRecorder
 class PywrHydraRunner(PywrHydraExporter):
     """ An extension to `PywrHydraExporter` that adds methods for running a Pywr model. """
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super(PywrHydraRunner, self).__init__(*args, **kwargs)
         self.model = None
 
     def _copy_scenario(self):
