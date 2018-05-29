@@ -10,6 +10,7 @@ from .template import register_template
 
 
 # TODO replace with a generic client loader from hydra_client
+# TODO get hydra_client to handle the authentication stuff
 def get_client():
     return JSONConnection(app_name='Pywr Hydra App')
 
@@ -20,9 +21,13 @@ def start_cli():
 
 @click.group()
 @click.pass_obj
-def cli(obj):
+@click.option('-u', '--user', type=str, default=None)
+@click.option('-p', '--password', type=str, default=None)
+def cli(obj, user, password):
     """ CLI for the Pywr-Hydra application. """
-    obj['client'] = get_client()
+    client = get_client()
+    client.login(username=user, password=password)
+    obj['client'] = client
 
 
 @cli.command(name='import')
