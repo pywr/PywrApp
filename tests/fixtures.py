@@ -3,20 +3,20 @@ import pytest
 import hydra_base
 from hydra_base import JSONObject
 from hydra_pywr.importer import PywrHydraImporter
-from hydra_pywr.template import pywr_template_name
+from hydra_pywr.template import pywr_template_name, register_template
 from hydra_client.connection import JSONConnection
+from hydra_base_fixtures import testdb_uri
 
 
 @pytest.fixture()
-def client():
-    return JSONConnection(app_name="Test Pywr application.")
+def client(testdb_uri):
+    return JSONConnection(app_name="Test Pywr application.", db_url=testdb_uri)
 
 
 @pytest.fixture()
 def logged_in_client(client):
     root_user_id = client.login('root', '')
     return client
-
 
 
 @pytest.fixture()
@@ -39,7 +39,7 @@ def pywr_json_filename(request, model_directory):
 
 
 @pytest.fixture()
-def db_with_pywr_network(pywr_json_filename, session_with_pywr_template, projectmaker, root_user_id):
+def session_with_pywr_network(pywr_json_filename, session_with_pywr_template, projectmaker, root_user_id):
     project = projectmaker.create()
 
     template = JSONObject(hydra_base.get_template_by_name(pywr_template_name()))
@@ -72,3 +72,21 @@ def db_with_pywr_network(pywr_json_filename, session_with_pywr_template, project
     hydra_base.add_attribute_group_items([JSONObject(i) for i in attribute_group_items], user_id=root_user_id)
 
     return hydra_network.id, pywr_json_filename
+
+
+@pytest.fixture()
+def db_with_template(db_with_users, logged_in_client):
+    register_template(logged_in_client)
+
+
+@pytest.fixture()
+def db_with_pywr_network(pywr_json_filename, db_with_template, projectmaker, logged_in_client):
+    client = logged_in_client
+
+    project = projectmaker.create()
+
+    importer = PywrHydraImporter.from_client(client, pywr_json_filename)
+    network_id = importer.import_data(client, project.id)
+
+    return network_id, pywr_json_filename
+

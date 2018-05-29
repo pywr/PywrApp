@@ -12,8 +12,8 @@ import pytest
 import json
 
 
-def test_export(db_with_pywr_network, root_user_id):
-    pywr_network_id, pywr_json_filename = db_with_pywr_network
+def test_export(session_with_pywr_network, root_user_id):
+    pywr_network_id, pywr_json_filename = session_with_pywr_network
 
     # Fetch the network
     network = hydra_base.get_network(pywr_network_id, user_id=root_user_id, include_data='Y')

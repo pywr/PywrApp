@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import datetime
+import os
 
 from hydra_pywr.template import generate_pywr_attributes, generate_pywr_template
 
@@ -19,10 +20,10 @@ def db_backend(request):
     return 'sqlite'
 
 @pytest.fixture()
-def testdb_uri(db_backend):
+def testdb_uri(db_backend, tmpdir):
     if db_backend == 'sqlite':
         # Use a :memory: database for the tests.
-        return 'sqlite://'
+        return 'sqlite:///{}'.format(os.path.join(tmpdir, 'test.db'))
     elif db_backend == 'postgres':
         # This is designed to work on Travis CI
         return 'postgresql://postgres@localhost:5432/hydra_base_test'
@@ -39,16 +40,15 @@ def engine(testdb_uri):
 
 
 @pytest.fixture(scope='function')
-def db(engine, request):
+def db_empty(engine, request):
     """ Test database """
     _db.metadata.create_all(engine)
     return _db
 
 
-@pytest.fixture(scope='function')
-def session(db, engine, request):
-    """Creates a new database session for a test."""
-    db.metadata.bind = engine
+@pytest.fixture()
+def db_with_users(db_empty, engine, request):
+    db_empty.metadata.bind = engine
 
     DBSession = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     # A DBSession() instance establishes all conversations with the database
@@ -70,6 +70,30 @@ def session(db, engine, request):
     create_user("UserA")
     create_user("UserB")
     create_user("UserC")
+
+    session.commit()
+    session.close()
+    hydra_base.db.DBSession = None
+    return db_empty
+
+
+@pytest.fixture(scope='function')
+def session(db_with_users, engine, request):
+    """Creates a new database session for a test."""
+    db_with_users.metadata.bind = engine
+
+    DBSession = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    # A DBSession() instance establishes all conversations with the database
+    # and represents a "staging zone" for all the objects loaded into the
+    # database session object. Any change made against the objects in the
+    # session won't be persisted into the database until you call
+    # session.commit(). If you're not happy about the changes, you can
+    # revert all of them back to the last commit by calling
+    # session.rollback()
+    session = DBSession()
+
+    # Patch the global session in hydra_base
+    hydra_base.db.DBSession = session
 
     yield session
 
