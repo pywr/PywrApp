@@ -3,7 +3,7 @@ from past.builtins import basestring
 from .template import pywr_template_name
 
 
-class PywrHydraExporter:
+class PywrHydraExporter(object):
     def __init__(self, data, attributes, attribute_group_items, template):
         self.data = data
         self.attributes = attributes

@@ -7,7 +7,7 @@ import logging
 log = logging.getLogger(__name__)
 
 
-class PywrHydraImporter:
+class PywrHydraImporter(object):
 
     def __init__(self, data, template):
         self.template = template
