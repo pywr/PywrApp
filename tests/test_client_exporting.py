@@ -3,8 +3,8 @@ from fixtures import *
 from hydra_base_fixtures import *
 from hydra_pywr.exporter import PywrHydraExporter
 from hydra_pywr.template import pywr_template_name
+from pywr.model import Model
 import json
-
 
 
 def test_export(db_with_pywr_network, logged_in_client):
@@ -20,4 +20,5 @@ def test_export(db_with_pywr_network, logged_in_client):
 
     assert_identical_pywr_data(pywr_data, pywr_data_exported)
 
-
+    m = Model.load(pywr_data)
+    m.run()
