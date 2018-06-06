@@ -103,8 +103,8 @@ def register(obj):
         # We also need to write a very basic script to run the command
         with open(os.path.join(plugin_path, 'run.sh'), 'w') as fh:
             fh.writelines([
-                '"# !/bin/bash',
-                'hydra-pywr "$@"',
+                '#!/bin/bash\n',
+                'hydra-pywr "$@"\n',
             ])
 
 
