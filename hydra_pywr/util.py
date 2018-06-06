@@ -70,4 +70,4 @@ def plugin_to_xml(data):
         else:
             e.text = value
 
-    return ET.ElementTree(root)
+    return root

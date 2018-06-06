@@ -1,5 +1,7 @@
 import click
 import os
+from xml.etree import ElementTree as ET
+from xml.dom.minidom import parseString
 import json
 from hydra_client.connection import JSONConnection
 from .exporter import PywrHydraExporter
@@ -88,7 +90,7 @@ def register(obj):
     if not os.path.exists(base_plugin_dir):
         os.mkdir(base_plugin_dir)
 
-    for name, element_tree in plugins:
+    for name, element in plugins:
         plugin_path = os.path.join(base_plugin_dir, name)
 
         if name == 'register':
@@ -97,8 +99,9 @@ def register(obj):
         if not os.path.exists(plugin_path):
             os.mkdir(plugin_path)
 
-        with open(os.path.join(plugin_path, 'plugin.xml'), 'wb') as fh:
-            element_tree.write(fh, encoding="utf8")
+        with open(os.path.join(plugin_path, 'plugin.xml'), 'w') as fh:
+            reparsed = parseString(ET.tostring(element, 'utf-8'))
+            fh.write(reparsed.toprettyxml(indent="\t"))
 
         # We also need to write a very basic script to run the command
         with open(os.path.join(plugin_path, 'run.sh'), 'w') as fh:
