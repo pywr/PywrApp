@@ -4,6 +4,11 @@
 import click
 from xml.etree import ElementTree as ET
 
+ARGTYPES = {
+    'network_id': 'network',
+    'scenario_id': 'scenario',
+}
+
 
 def make_plugins(group):
     """ Generator of plugin XML data from the hydra_pywr CLI. """
@@ -46,12 +51,19 @@ def make_args(command, required=True):
         if param.required != required:
             continue
 
-        yield {
+        arg = {
             'name': param.name,
             'switch': '--' + param.name.replace('_', '-'),
             'multiple': 'Y' if param.multiple else 'N',
-            #'argtype': param.type
         }
+
+        # Add argtype if matches a given type.
+        try:
+            arg['argtype'] = ARGTYPES[param.name]
+        except KeyError:
+            pass
+
+        yield arg
 
 
 def plugin_to_xml(data):
