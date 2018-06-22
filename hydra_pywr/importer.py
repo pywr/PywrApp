@@ -2,14 +2,16 @@ import json
 import warnings
 from past.builtins import basestring
 from .template import PYWR_PROTECTED_NODE_KEYS, pywr_template_name
+from .core import BasePywrHydra
 
 import logging
 log = logging.getLogger(__name__)
 
 
-class PywrHydraImporter(object):
+class PywrHydraImporter(BasePywrHydra):
 
     def __init__(self, data, template):
+        super().__init__()
         self.template = template
 
         if isinstance(data, basestring):
@@ -23,8 +25,6 @@ class PywrHydraImporter(object):
 
         self.data = data
 
-        # Default internal variables
-        self.next_resource_attribute_id = -1
         self.next_node_id = -1
 
     @classmethod
@@ -320,41 +320,6 @@ class PywrHydraImporter(object):
             link_id -= 1
 
         return hydra_nodes, hydra_links, hydra_resource_scenarios
-
-    def _make_dataset_resource_attribute_and_scenario(self, name, value, attribute_id, dimension='dimensionless',
-                                                      encode_to_json=False,):
-        """ A helper method to make a dataset, resource attribute and resource scenario. """
-
-        resource_attribute_id = self.next_resource_attribute_id
-        self.next_resource_attribute_id -= 1
-
-        # Create a dataset representing the value
-        dataset = {
-            'name': name,
-            'value': json.dumps(value) if encode_to_json else value,
-            "hidden": "N",
-            "type": "descriptor",  # TODO make this dependent on the value (i.e. scalar if int or float)
-            "dimension": dimension,
-            "unit": "-",
-            "metadata": json.dumps({'json_encoded': encode_to_json})
-        }
-
-        # Create a resource scenario linking the dataset to the scenario
-        resource_scenario = {
-            'resource_attr_id': resource_attribute_id,
-            'attr_id': attribute_id,
-            'dataset': dataset
-        }
-
-        # Create a resource attribute linking the resource scenario to the node
-        resource_attribute = {
-            'id': resource_attribute_id,
-            'attr_id': attribute_id,
-            'attr_is_var': 'N'
-        }
-
-        # Finally return resource attribute and resource scenario
-        return resource_attribute, resource_scenario
 
     def generate_node_resource_scenarios(self, pywr_node, attribute_ids, dimension='dimensionless'):
         """ Generate resource attribute, resource scenario and datasets for a Pywr node.

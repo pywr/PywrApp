@@ -2,11 +2,21 @@
 """
 # TODO import the other domains
 from pywr.domains.river import *
-from pywr.nodes import NodeMeta
+from pywr.nodes import NodeMeta, Node, Storage
 from pywr.schema.nodes import BaseNodeSchema
+from pywr.recorders import NumpyArrayNodeRecorder, NumpyArrayStorageRecorder
 import pywr
 
+
 PYWR_PROTECTED_NODE_KEYS = ('name', 'comment', 'type')
+
+PYWR_ARRAY_RECORDER_ATTRIBUTES = {
+    NumpyArrayNodeRecorder: 'simulated_flow',
+    NumpyArrayStorageRecorder: 'simulated_volume'
+}
+
+
+PYWR_OUTPUT_ATTRIBUTES = list(PYWR_ARRAY_RECORDER_ATTRIBUTES.values())
 
 
 def pywr_template_name():
@@ -17,6 +27,19 @@ def pywr_template_name():
 def generate_pywr_attributes():
 
     attribute_names = set()
+
+    # First add the constant attributes defined here.
+    for name in PYWR_OUTPUT_ATTRIBUTES:
+        if name not in attribute_names:
+            yield {
+                'name': name,
+                'dimension': 'dimensionless',
+                'description': ''
+                ''
+            }
+            attribute_names.add(name)
+
+    # Now add those from the Pywr schemas
     for node_name, node_klass in NodeMeta.node_registry.items():
         schema = BaseNodeSchema.get_schema(node_name, None)
 
@@ -47,6 +70,21 @@ def generate_pywr_node_templates(attribute_ids):
             type_attributes.append({
                 'attr_id': attribute_ids[name],
                 'description': '',
+            })
+
+        # Create an output attribute for each node
+        if issubclass(node_klass, Node):
+            output_attribute_name = 'simulated_flow'
+        elif issubclass(node_klass, Storage):
+            output_attribute_name = 'simulated_volume'
+        else:
+            output_attribute_name = None
+
+        if output_attribute_name is not None:
+            type_attributes.append({
+                'attr_id': attribute_ids[output_attribute_name],
+                'description': '',
+                'attr_is_var': 'Y'
             })
 
         yield {

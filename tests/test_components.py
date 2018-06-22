@@ -104,16 +104,19 @@ def test_components_to_datasets(pywr_component_importer, hydra_attribute_ids):
 
         # Find the attribute linked to this data; there should only be one.
         num_found = 0
+        attr_id = None
         for attr_data in resource_attributes:
             if attr_data['id'] == data['resource_attr_id']:
                 num_found += 1
+                attr_id = attr_data['attr_id']
         # And ensure we found at exactly one.
         assert num_found == 1
+        assert attr_id is not None
 
         # Find the attribute name for this data
         attr_name = None
-        for name, attr_id in hydra_attribute_ids.items():
-            if data['attr_id'] == attr_id:
+        for name, hydra_attr_id in hydra_attribute_ids.items():
+            if attr_id == hydra_attr_id:
                 attr_name = name
                 break
         else:

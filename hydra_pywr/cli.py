@@ -72,7 +72,7 @@ def run(obj, network_id, scenario_id):
 
     runner.run_pywr_model()
 
-    runner.save_pywr_results()
+    runner.save_pywr_results(client)
 
 
 @cli.command()

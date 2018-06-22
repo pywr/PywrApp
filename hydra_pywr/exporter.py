@@ -1,10 +1,12 @@
 import json
 from past.builtins import basestring
 from .template import pywr_template_name
+from .core import BasePywrHydra
 
 
-class PywrHydraExporter(object):
+class PywrHydraExporter(BasePywrHydra):
     def __init__(self, data, attributes, attribute_group_items, template):
+        super().__init__()
         self.data = data
         self.attributes = attributes
         self.attribute_group_items = attribute_group_items
