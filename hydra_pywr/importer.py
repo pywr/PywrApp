@@ -84,13 +84,16 @@ class PywrHydraImporter(object):
 
         hydra_network = client.add_network(network)
 
+        # Get the added scenario_id. There should only be one scenario
+        assert len(hydra_network['scenarios']) == 1
+        scenario_id = hydra_network['scenarios'][0]['id']
         # Now we have to add the attribute group items
         attribute_group_items = self.add_attribute_group_items_request_data(attribute_ids, attribute_group_ids,
                                                                                 hydra_network.id)
 
         client.add_attribute_group_items(attribute_group_items)
 
-        return hydra_network.id
+        return hydra_network.id, scenario_id
 
     def add_attributes_request_data(self):
         """ Generate the data for adding attributes to Hydra. """

@@ -11,9 +11,9 @@ class PywrHydraExporter(object):
         self.template = template
 
     @classmethod
-    def from_network_id(cls, client, network_id):
+    def from_network_id(cls, client, network_id, scenario_id):
         # Fetch the network
-        network = client.get_network(network_id, include_data='Y')
+        network = client.get_network(network_id, include_data='Y', scenario_ids=[scenario_id])
         # Fetch all the attributes
         attributes = client.get_attributes()
         attributes = {attr.id: attr for attr in attributes}

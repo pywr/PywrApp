@@ -66,7 +66,7 @@ def run(obj, network_id, scenario_id):
     """ Export, run and save a Pywr model from Hydra. """
 
     client = obj['client']
-    runner = PywrHydraRunner.from_network_id(client, network_id)
+    runner = PywrHydraRunner.from_network_id(client, network_id, scenario_id)
 
     runner.load_pywr_model()
 

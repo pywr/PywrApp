@@ -10,8 +10,8 @@ import json
 def test_export(db_with_pywr_network, logged_in_client):
     client = logged_in_client
 
-    pywr_network_id, pywr_json_filename = db_with_pywr_network
-    exporter = PywrHydraExporter.from_network_id(client, pywr_network_id)
+    pywr_network_id, pywr_scenario_id, pywr_json_filename = db_with_pywr_network
+    exporter = PywrHydraExporter.from_network_id(client, pywr_network_id, pywr_scenario_id)
     pywr_data_exported = exporter.get_pywr_data()
 
     # Check transformed data is about right

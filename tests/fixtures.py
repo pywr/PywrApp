@@ -86,7 +86,7 @@ def db_with_pywr_network(pywr_json_filename, db_with_template, projectmaker, log
     project = projectmaker.create()
 
     importer = PywrHydraImporter.from_client(client, pywr_json_filename)
-    network_id = importer.import_data(client, project.id)
+    network_id, scenario_id = importer.import_data(client, project.id)
 
-    return network_id, pywr_json_filename
+    return network_id, scenario_id, pywr_json_filename
 
