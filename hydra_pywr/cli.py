@@ -13,23 +13,32 @@ from .template import register_template
 
 # TODO replace with a generic client loader from hydra_client
 # TODO get hydra_client to handle the authentication stuff
-def get_client():
-    return JSONConnection(app_name='Pywr Hydra App')
+# TODO add configurable URL
+def get_client(hostname):
+    return JSONConnection(app_name='Pywr Hydra App', db_url=hostname)
+
+
+def get_logged_in_client(context):
+    client = get_client(context['hostname'])
+    client.login(username=context['username'], password=context['password'])
+    return client
 
 
 def start_cli():
-    cli(obj={})
+    cli(obj={}, auto_envvar_prefix='HYDRA_PYWR')
 
 
 @click.group()
 @click.pass_obj
-@click.option('-u', '--user', type=str, default=None)
+@click.option('-u', '--username', type=str, default=None)
 @click.option('-p', '--password', type=str, default=None)
-def cli(obj, user, password):
+@click.option('-h', '--hostname', type=str, default=None)
+def cli(obj, username, password, hostname):
     """ CLI for the Pywr-Hydra application. """
-    client = get_client()
-    client.login(username=user, password=password)
-    obj['client'] = client
+
+    obj['hostname'] = hostname
+    obj['username'] = username
+    obj['password'] = password
 
 
 @cli.command(name='import')
@@ -38,7 +47,7 @@ def cli(obj, user, password):
 @click.argument('project_id', type=int)
 def import_json(obj, filename, project_id):
     """ Import a Pywr JSON file into Hydra. """
-    client = obj['client']
+    client = get_logged_in_client(obj)
     importer = PywrHydraImporter.from_client(client, filename)
     importer.import_data(client, project_id)
 
@@ -51,7 +60,7 @@ def import_json(obj, filename, project_id):
 @click.option('--json-sort-keys', type=int, default=True)
 def export_json(obj, filename, network_id, sort_keys, indent):
     """ Export a Pywr JSON from Hydra. """
-    client = obj['client']
+    client = get_logged_in_client(obj)
     exporter = PywrHydraExporter.from_network_id(client, network_id)
 
     with open(filename, mode='w') as fh:
@@ -65,7 +74,7 @@ def export_json(obj, filename, network_id, sort_keys, indent):
 def run(obj, network_id, scenario_id):
     """ Export, run and save a Pywr model from Hydra. """
 
-    client = obj['client']
+    client = get_logged_in_client(obj)
     runner = PywrHydraRunner.from_network_id(client, network_id, scenario_id)
 
     runner.load_pywr_model()
@@ -121,5 +130,5 @@ def template():
 def template_register(obj):
     """ Register a Pywr template with Hydra. """
 
-    client = obj['client']
+    client = get_logged_in_client(obj)
     register_template(client)
