@@ -1,5 +1,6 @@
 import click
 import os
+from pathlib import Path
 from xml.etree import ElementTree as ET
 from xml.dom.minidom import parseString
 import json
@@ -86,18 +87,20 @@ def run(obj, network_id, scenario_id):
 
 @cli.command()
 @click.pass_obj
-def register(obj):
+@click.argument('docker-image', type=str)
+@click.argument('docker-tag', type=str)
+def register(obj, docker_image, docker_tag):
     """ Register the app with the Hydra installation. """
     import hydra_base
 
     plugins = make_plugins(cli)
 
-    base_plugin_dir = hydra_base.config.get('plugin', 'default_directory')
+    base_plugin_dir = Path(hydra_base.config.get('plugin', 'default_directory'))
 
-    base_plugin_dir = os.path.join(base_plugin_dir, 'PywrApp')
+    base_plugin_dir = base_plugin_dir.joinpath(f'pywr-{docker_tag}')
 
-    if not os.path.exists(base_plugin_dir):
-        os.mkdir(base_plugin_dir)
+    if not base_plugin_dir.exists():
+        base_plugin_dir.mkdir(parents=True, exist_ok=True)
 
     for name, element in plugins:
         plugin_path = os.path.join(base_plugin_dir, name)
@@ -116,7 +119,7 @@ def register(obj):
         with open(os.path.join(plugin_path, 'run.sh'), 'w') as fh:
             fh.writelines([
                 '#!/bin/bash\n',
-                'hydra-pywr "$@"\n',
+                f'docker run -t {docker_image}:{docker_tag} hydra-pywr "$@"\n',
             ])
 
 
