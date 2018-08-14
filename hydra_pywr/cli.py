@@ -57,12 +57,13 @@ def import_json(obj, filename, project_id):
 @click.pass_obj
 @click.argument('filename', type=click.Path(file_okay=True, dir_okay=False))
 @click.option('-n', '--network-id', type=int, default=None)
+@click.option('-s', '--scenario-id', type=int, default=None)
 @click.option('--json-indent', type=int, default=2)
 @click.option('--json-sort-keys', type=int, default=True)
-def export_json(obj, filename, network_id, json_sort_keys, json_indent):
+def export_json(obj, filename, network_id, scenario_id, json_sort_keys, json_indent):
     """ Export a Pywr JSON from Hydra. """
     client = get_logged_in_client(obj)
-    exporter = PywrHydraExporter.from_network_id(client, network_id)
+    exporter = PywrHydraExporter.from_network_id(client, network_id, scenario_id)
 
     with open(filename, mode='w') as fh:
         json.dump(exporter.get_pywr_data(), fh, sort_keys=json_sort_keys, indent=json_indent)
