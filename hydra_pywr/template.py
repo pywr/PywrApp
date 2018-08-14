@@ -3,7 +3,6 @@
 # TODO import the other domains
 from pywr.domains.river import *
 from pywr.nodes import NodeMeta, Node, Storage
-from pywr.schema.nodes import BaseNodeSchema
 from pywr.recorders import NumpyArrayNodeRecorder, NumpyArrayStorageRecorder
 import pywr
 
@@ -41,7 +40,7 @@ def generate_pywr_attributes():
 
     # Now add those from the Pywr schemas
     for node_name, node_klass in NodeMeta.node_registry.items():
-        schema = BaseNodeSchema.get_schema(node_name, None)
+        schema = node_klass.Schema()
 
         for name, field in schema.fields.items():
             if name in PYWR_PROTECTED_NODE_KEYS:
@@ -59,7 +58,7 @@ def generate_pywr_attributes():
 def generate_pywr_node_templates(attribute_ids):
 
     for node_name, node_klass in NodeMeta.node_registry.items():
-        schema = BaseNodeSchema.get_schema(node_name, None)
+        schema = node_klass.Schema()
 
         # Create an attribute for each field in the schema.
         type_attributes = []
