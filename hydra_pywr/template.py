@@ -135,3 +135,9 @@ def register_template(client):
     template = generate_pywr_template(attribute_ids)
 
     client.add_template(template)
+
+
+def unregister_template(client):
+    """ Unregister the template with Hydra. """
+    template = client.get_template_by_name(pywr_template_name())
+    client.delete_template(template['id'])

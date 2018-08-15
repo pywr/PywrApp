@@ -9,7 +9,7 @@ from .exporter import PywrHydraExporter
 from .runner import PywrHydraRunner
 from .importer import PywrHydraImporter
 from .util import make_plugins
-from .template import register_template
+from .template import register_template, unregister_template
 
 
 # TODO replace with a generic client loader from hydra_client
@@ -136,3 +136,11 @@ def template_register(obj):
 
     client = get_logged_in_client(obj)
     register_template(client)
+    
+    
+@template.command('unregister')
+@click.pass_obj
+def template_unregister(obj):
+    """ Unregister a Pywr template with Hydra. """
+    client = get_logged_in_client(obj)
+    unregister_template(client)
