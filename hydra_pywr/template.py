@@ -14,8 +14,13 @@ PYWR_ARRAY_RECORDER_ATTRIBUTES = {
     NumpyArrayStorageRecorder: 'simulated_volume'
 }
 
-
 PYWR_OUTPUT_ATTRIBUTES = list(PYWR_ARRAY_RECORDER_ATTRIBUTES.values())
+PYWR_TIMESTEPPER_ATTRIBUTES = ('start', 'end', 'timestep')
+PYWR_DEFAULT_DATASETS = {
+    'start': {'data_type': 'descriptor', 'val': '2018-01-01', 'units': 'date', 'name': 'Default start date'},
+    'end': {'data_type': 'descriptor', 'val': '2018-12-31', 'units': 'date', 'name': 'Default end date'},
+    'timestep': {'data_type': 'scalar', 'val': 1, 'units': 'days', 'name': 'Default timestep'},
+}
 
 
 def pywr_template_name():
@@ -27,14 +32,22 @@ def generate_pywr_attributes():
 
     attribute_names = set()
 
-    # First add the constant attributes defined here.
+    # First add the attributes for the timestepper section
+    for name in PYWR_TIMESTEPPER_ATTRIBUTES:
+        if name not in attribute_names:
+            yield {
+                'name': name,
+                'dimension': 'dimensionless',
+                'description': ''
+            }
+
+    # Now add the constant attributes defined here.
     for name in PYWR_OUTPUT_ATTRIBUTES:
         if name not in attribute_names:
             yield {
                 'name': name,
                 'dimension': 'dimensionless',
                 'description': ''
-                ''
             }
             attribute_names.add(name)
 
@@ -68,6 +81,7 @@ def generate_pywr_node_templates(attribute_ids):
 
             type_attributes.append({
                 'attr_id': attribute_ids[name],
+                'data_type': 'descriptor',
                 'description': '',
             })
 
@@ -83,6 +97,7 @@ def generate_pywr_node_templates(attribute_ids):
             type_attributes.append({
                 'attr_id': attribute_ids[output_attribute_name],
                 'description': '',
+                'data_type': 'dataframe',
                 'is_var': 'Y'
             })
 
@@ -93,7 +108,7 @@ def generate_pywr_node_templates(attribute_ids):
         }
 
 
-def generate_pywr_template(attribute_ids):
+def generate_pywr_template(attribute_ids, default_data_set_ids):
 
     template_types = [
         {
@@ -104,7 +119,16 @@ def generate_pywr_template(attribute_ids):
         {
             'name': 'pywr',
             'resource_type': 'NETWORK',
-            'typeattrs': []  # TODO add default network attributes
+            'typeattrs': [
+                {
+                    'attr_id': attribute_ids[name],
+                    'data_type': 'descriptor' if name != 'timestep' else 'scalar',
+                    'description': '',
+                    'default_dataset_id': default_data_set_ids[name],
+                    'is_var': 'N'
+                }
+                for name in PYWR_TIMESTEPPER_ATTRIBUTES
+            ]
         }
     ]
 
@@ -120,6 +144,15 @@ def generate_pywr_template(attribute_ids):
     return template
 
 
+def add_default_datasets(client):
+
+    default_data_set_ids = {}
+    for attribute_name, dataset in PYWR_DEFAULT_DATASETS.items():
+        hydra_dataset = client.add_dataset(flush=True, **dataset)
+        default_data_set_ids[attribute_name] = hydra_dataset['id']
+    return default_data_set_ids
+
+
 def register_template(client):
     """ Register the template with Hydra. """
 
@@ -129,10 +162,13 @@ def register_template(client):
     # The response attributes have ids now.
     response_attributes = client.add_attributes(attributes)
 
+    # Now add the default datasets
+    default_data_set_ids = add_default_datasets(client)
+
     # Convert to a simple dict for local processing.
     attribute_ids = {a.name: a.id for a in response_attributes}
 
-    template = generate_pywr_template(attribute_ids)
+    template = generate_pywr_template(attribute_ids, default_data_set_ids)
 
     client.add_template(template)
 

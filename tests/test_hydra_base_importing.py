@@ -5,7 +5,7 @@ from helpers import *
 from fixtures import *
 from hydra_base_fixtures import *
 from hydra_pywr.importer import PywrHydraImporter
-from hydra_pywr.template import generate_pywr_attributes, generate_pywr_template, pywr_template_name
+from hydra_pywr.template import generate_pywr_attributes, generate_pywr_template, pywr_template_name, PYWR_DEFAULT_DATASETS
 import hydra_base
 import pytest
 import json
@@ -61,6 +61,11 @@ def test_add_template(session, root_user_id):
     # Convert to a simple dict for local processing.
     attribute_ids = {a.name: a.id for a in response_attributes}
 
-    template = generate_pywr_template(attribute_ids)
+    default_data_set_ids = {}
+    for attribute_name, dataset in PYWR_DEFAULT_DATASETS.items():
+        hydra_dataset = hydra_base.add_dataset(flush=True, **dataset)
+        default_data_set_ids[attribute_name] = hydra_dataset.id    
+
+    template = generate_pywr_template(attribute_ids, default_data_set_ids)
 
     hydra_base.add_template(JSONObject(template))

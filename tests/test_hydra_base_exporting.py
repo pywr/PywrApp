@@ -46,4 +46,3 @@ def test_export(session_with_pywr_network, root_user_id):
 
     assert_identical_pywr_data(pywr_data, pywr_data_exported)
 
-

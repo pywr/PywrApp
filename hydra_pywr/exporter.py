@@ -1,6 +1,6 @@
 import json
 from past.builtins import basestring
-from .template import pywr_template_name
+from .template import pywr_template_name, PYWR_TIMESTEPPER_ATTRIBUTES
 from .core import BasePywrHydra
 
 
@@ -50,7 +50,10 @@ class PywrHydraExporter(BasePywrHydra):
 
             # Only make the section if it contains data.
             if len(group_data) > 0:
-                pywr_data[group_name] = group_data
+                if group_name in pywr_data:
+                    pywr_data[group_name].update(group_data)
+                else:
+                    pywr_data[group_name] = group_data
 
         nodes = []
         for node in self.generate_pywr_nodes():
@@ -75,11 +78,28 @@ class PywrHydraExporter(BasePywrHydra):
 
     def _get_attributes_for_group_from_name(self, group_name):
 
-        group = self._get_attribute_group_from_name(group_name)
+        attributes_found = set()
 
-        for attribute_group_item in self.attribute_group_items:
-            if attribute_group_item['group_id'] == group['id']:
-                yield self.attributes[attribute_group_item['attr_id']]
+        # Special case for timestepper where the PYWR_TIMESTEPPER ATTRIBUTES are found
+        # to be in the "timestepper" group regardless of the mappings in the database.
+        # This is a work around until there is improved template support for groups in hydra.
+        if group_name == 'timestepper':
+            for attribute_id, attribute in self.attributes.items():
+                if attribute['name'] in PYWR_TIMESTEPPER_ATTRIBUTES:
+                    if attribute_id not in attributes_found:
+                        attributes_found.add(attribute_id)
+                        yield attribute
+
+        try:
+            group = self._get_attribute_group_from_name(group_name)
+        except ValueError:
+            pass
+        else:
+            for attribute_group_item in self.attribute_group_items:
+                if attribute_group_item['group_id'] == group['id']:
+                    if attribute_group_item['attr_id'] not in attributes_found:
+                        attributes_found.add(attribute_group_item['attr_id'])
+                        yield self.attributes[attribute_group_item['attr_id']]
 
     def _get_resource_scenario(self, resource_attribute_id):
 
@@ -136,6 +156,12 @@ class PywrHydraExporter(BasePywrHydra):
                 else:
                     pywr_node[attribute['name']] = value
 
+            if node['x'] is not None and node['y'] is not None:
+                # Finally add coordinates from hydra
+                if 'position' not in pywr_node:
+                    pywr_node['position'] = {}
+                pywr_node['position'].update({'geographic': [node['x'], node['y']]})
+
             yield pywr_node
 
     def generate_pywr_edges(self):
@@ -150,16 +176,11 @@ class PywrHydraExporter(BasePywrHydra):
         """ Generator returning a key and dict value for meta keys. """
 
         # These are all the attributes associated with the group
-        try:
-            group_attributes = list(self._get_attributes_for_group_from_name(group_name))
-        except ValueError:
-            # No group exists so there is no data
-            return
+        group_attributes = list(self._get_attributes_for_group_from_name(group_name))
 
         for resource_attribute in self.data['attributes']:
 
             attribute = self.attributes[resource_attribute['attr_id']]
-
             attribute_name = attribute['name']
 
             for group_attribute in group_attributes:
@@ -183,8 +204,3 @@ class PywrHydraExporter(BasePywrHydra):
                 value = int(value)
 
             yield attribute_name, value
-
-
-
-
-

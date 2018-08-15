@@ -46,6 +46,8 @@ def assert_hydra_pywr(hydra_data, pywr_data):
 
     metadata = pywr_data['metadata']
     for key, value in metadata.items():
+        if key in ('title', 'description'):
+            continue
         assert_dataset(hydra_data, key, value)
 
     # Ensure that the pywr parameters exist as a hydra dataset

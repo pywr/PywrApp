@@ -148,7 +148,6 @@ class PywrHydraImporter(BasePywrHydra):
                 network_attributes.append(resource_attribute)
                 resource_scenarios.append(resource_scenario)
 
-        # TODO name and description are added to network data
         # TODO timestepper data is on the scenario.
         for component_key in ('metadata', 'timestepper'):
             generator = self.generate_component_resource_scenarios(component_key, attribute_ids, encode_to_json=False)
