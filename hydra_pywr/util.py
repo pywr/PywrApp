@@ -13,21 +13,30 @@ ARGTYPES = {
 def make_plugins(group):
     """ Generator of plugin XML data from the hydra_pywr CLI. """
     for name, command in group.commands.items():
+
+        try:
+            hydra_app_category = command.hydra_app_category
+        except AttributeError:
+            hydra_app_category = False
+
+        if not hydra_app_category:
+            continue
+
         # Create plugin data for each sub-command of the group.
-        data = make_plugin(command)
+        data = make_plugin(command, hydra_app_category)
         # Convert the data to etree ElementTree
         xml = plugin_to_xml(data)
         yield name, xml
 
 
-def make_plugin(command):
+def make_plugin(command, category):
     """ Make an individual plugin XML definition from a `click.Command`. """
 
     return {
         'plugin_name': command.short_help,
         'plugin_dir': '',
         'plugin_description': command.help,
-        'plugin_category': 'import',
+        'plugin_category': category,
         'plugin_command': 'run.sh {}'.format(command.name),
         'plugin_shell': 'bash',
         'plugin_location': '.',

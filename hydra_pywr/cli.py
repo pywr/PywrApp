@@ -12,6 +12,13 @@ from .util import make_plugins
 from .template import register_template, unregister_template
 
 
+def hydra_app(category='import'):
+    def hydra_app_decorator(func):
+        func.hydra_app_category = category
+        return func
+    return hydra_app_decorator
+
+
 # TODO replace with a generic client loader from hydra_client
 # TODO get hydra_client to handle the authentication stuff
 # TODO add configurable URL
@@ -42,6 +49,7 @@ def cli(obj, username, password, hostname):
     obj['password'] = password
 
 
+@hydra_app()
 @cli.command(name='import')
 @click.pass_obj
 @click.argument('filename', type=click.Path(file_okay=True, dir_okay=False, exists=True))
@@ -53,6 +61,7 @@ def import_json(obj, filename, project_id):
     importer.import_data(client, project_id)
 
 
+@hydra_app(category='export')
 @cli.command(name='export')
 @click.pass_obj
 @click.argument('filename', type=click.Path(file_okay=True, dir_okay=False))
@@ -69,6 +78,7 @@ def export_json(obj, filename, network_id, scenario_id, json_sort_keys, json_ind
         json.dump(exporter.get_pywr_data(), fh, sort_keys=json_sort_keys, indent=json_indent)
 
 
+@hydra_app(category='model')
 @cli.command()
 @click.pass_obj
 @click.option('-n', '--network-id', type=int, default=None)
@@ -106,8 +116,8 @@ def register(obj, docker_image, docker_tag):
     for name, element in plugins:
         plugin_path = os.path.join(base_plugin_dir, name)
 
-        if name == 'register':
-            continue  # Don't register this command
+        if name not in ('import', 'export', 'run'):
+            continue  # Only reigster whitelisted commands
 
         if not os.path.exists(plugin_path):
             os.mkdir(plugin_path)
