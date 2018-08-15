@@ -83,7 +83,7 @@ def generate_pywr_node_templates(attribute_ids):
             type_attributes.append({
                 'attr_id': attribute_ids[output_attribute_name],
                 'description': '',
-                'attr_is_var': 'Y'
+                'is_var': 'Y'
             })
 
         yield {
