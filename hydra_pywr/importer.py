@@ -183,9 +183,6 @@ class PywrHydraImporter(BasePywrHydra):
         scenario = {
             "name": "",  # TODO give this a name
             "description": "",  # TODO give this a description
-            "start_time": timestepper['start'],
-            "end_time": timestepper['end'],
-            "time_step": str(timestepper['timestep']),
             "resourcescenarios": resource_scenarios
         }
         return scenario
@@ -371,6 +368,12 @@ class PywrHydraImporter(BasePywrHydra):
             components = {}
 
         for component_name, component_data in components.items():
+            if component_key == 'metadata':
+                if component_name in ('title', 'description'):
+                    # These names are saved on the hydra network directly (name and descripton)
+                    # therefore do not add as a attributes as well.
+                    continue
+
             # This the attribute corresponding to the component.
             # It should have a positive id and already be entered in the hydra database.
             attribute_id = attribute_ids[component_name]

@@ -35,7 +35,9 @@ class PywrHydraExporter(BasePywrHydra):
 
     def get_pywr_data(self):
 
-        pywr_data = {}
+        pywr_data = {
+            'metadata': {'title': self.data['name'], 'description': self.data['description']}
+        }
 
         # TODO see proposed changes to metadata and timestepper data.
         for group_name in ('metadata', 'timestepper', 'recorders', 'parameters'):
