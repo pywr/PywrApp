@@ -19,16 +19,15 @@ def hydra_app(category='import'):
     return hydra_app_decorator
 
 
-# TODO replace with a generic client loader from hydra_client
-# TODO get hydra_client to handle the authentication stuff
-# TODO add configurable URL
-def get_client(hostname):
-    return JSONConnection(app_name='Pywr Hydra App', db_url=hostname)
+def get_client(hostname, session):
+    return JSONConnection(app_name='Pywr Hydra App', db_url=hostname, session_id=session)
 
 
 def get_logged_in_client(context):
-    client = get_client(context['hostname'])
-    client.login(username=context['username'], password=context['password'])
+    session = context['session']
+    client = get_client(context['hostname'], session)
+    if session is None:
+        client.login(username=context['username'], password=context['password'])
     return client
 
 
@@ -41,12 +40,14 @@ def start_cli():
 @click.option('-u', '--username', type=str, default=None)
 @click.option('-p', '--password', type=str, default=None)
 @click.option('-h', '--hostname', type=str, default=None)
-def cli(obj, username, password, hostname):
+@click.option('-s', '--session', type=str, default=None)
+def cli(obj, username, password, hostname, session):
     """ CLI for the Pywr-Hydra application. """
 
     obj['hostname'] = hostname
     obj['username'] = username
     obj['password'] = password
+    obj['session'] = session
 
 
 @hydra_app()
