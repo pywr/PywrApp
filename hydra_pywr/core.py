@@ -6,8 +6,8 @@ class BasePywrHydra:
         # Default internal variables
         self.next_resource_attribute_id = -1
 
-    def _make_dataset_resource_scenario(self, name, value, resource_attribute_id, dimension='dimensionless',
-                                                      encode_to_json=False,):
+    def _make_dataset_resource_scenario(self, name, value, resource_attribute_id, data_type='descriptor',
+                                        encode_to_json=False,):
         """ A helper method to make a dataset, resource attribute and resource scenario. """
 
         # Create a dataset representing the value
@@ -15,8 +15,7 @@ class BasePywrHydra:
             'name': name,
             'value': json.dumps(value) if encode_to_json else value,
             "hidden": "N",
-            "type": "descriptor",  # TODO make this dependent on the value (i.e. scalar if int or float)
-            "dimension": dimension,
+            "type": data_type,
             "unit": "-",
             "metadata": json.dumps({'json_encoded': encode_to_json})
         }

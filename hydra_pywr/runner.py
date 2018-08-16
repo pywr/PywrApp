@@ -124,7 +124,7 @@ class PywrHydraRunner(PywrHydraExporter):
             resource_attribute_id = self._get_resource_attribute_id(recorder.node.name, attribute)
 
             resource_scenario = self._make_dataset_resource_scenario(recorder.name, value, resource_attribute_id,
-                                                                     encode_to_json=False)
+                                                                     encode_to_json=False, data_type='dataframe')
 
             yield resource_scenario
 
