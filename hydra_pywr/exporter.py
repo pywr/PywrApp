@@ -148,6 +148,10 @@ class PywrHydraExporter(BasePywrHydra):
                     resource_scenario = self._get_resource_scenario(resource_attribute['id'])
                 except ValueError:
                     continue  # No data associated with this attribute.
+
+                if resource_attribute['attr_is_var']:
+                    continue
+
                 dataset = resource_scenario['dataset']
                 value = dataset['value']
 
