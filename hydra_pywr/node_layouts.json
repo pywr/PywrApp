@@ -1,0 +1,32 @@
+{
+  "__default__": {
+    "shape": "circle",
+    "size": "large",
+    "height": 20,
+    "width": 20,
+    "color": "#000000",
+    "hidden": "N"
+  },
+  "input": {
+    "color": "#0055ff"
+  },
+  "catchment": {
+    "color": "#00aa00"
+  },
+  "output": {
+    "color": "#ff5500"
+  },
+  "storage": {
+    "shape": "triangle",
+    "height": 30,
+    "width": 30,
+    "color": "#0055ff"
+  },
+  "aggregatednode": {
+    "shape": "square"
+  },
+  "aggregatedstorage": {
+    "shape": "square",
+    "color": "#0055ff"
+  }
+}
