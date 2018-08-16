@@ -5,6 +5,9 @@ from pywr.domains.river import *
 from pywr.nodes import NodeMeta, Node, Storage
 from pywr.recorders import NumpyArrayNodeRecorder, NumpyArrayStorageRecorder
 import pywr
+import os
+import json
+import copy
 
 
 PYWR_PROTECTED_NODE_KEYS = ('name', 'comment', 'type')
@@ -21,6 +24,23 @@ PYWR_DEFAULT_DATASETS = {
     'end': {'data_type': 'descriptor', 'val': '2018-12-31', 'units': 'date', 'name': 'Default end date'},
     'timestep': {'data_type': 'scalar', 'val': 1, 'units': 'days', 'name': 'Default timestep'},
 }
+
+
+def _load_layouts():
+    with open(os.path.join(os.path.dirname(__file__), 'node_layouts.json')) as fh:
+        return json.load(fh)
+PYWR_LAYOUTS = _load_layouts()
+
+
+def get_layout(node_klass):
+
+    layout = copy.deepcopy(PYWR_LAYOUTS['__default__'])
+    try:
+        node_specific_layout = PYWR_LAYOUTS[node_klass.__name__.lower()]
+    except KeyError:
+        node_specific_layout = {}
+    layout.update(node_specific_layout)
+    return layout
 
 
 def pywr_template_name():
@@ -101,10 +121,15 @@ def generate_pywr_node_templates(attribute_ids):
                 'is_var': 'Y'
             })
 
+        # Now create the layout
+        layout = get_layout(node_klass)
+        print(layout)
+
         yield {
             'name': node_name,
             'resource_type': 'NODE',
-            'typeattrs': type_attributes
+            'typeattrs': type_attributes,
+            'layout': layout,
         }
 
 
@@ -114,7 +139,9 @@ def generate_pywr_template(attribute_ids, default_data_set_ids):
         {
             'name': 'edge',
             'resource_type': 'LINK',
-            'typeattrs': []
+            'typeattrs': [],
+            # Default layout for links
+            'layout': {"linestyle": "solid", "width": "7", "color": "#000000", "hidden": "N"}
         },
         {
             'name': 'pywr',
