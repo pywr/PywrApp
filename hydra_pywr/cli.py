@@ -1,6 +1,7 @@
 import click
 import os
 from pathlib import Path
+from shutil import copyfile
 from xml.etree import ElementTree as ET
 from xml.dom.minidom import parseString
 import json
@@ -10,6 +11,8 @@ from .runner import PywrHydraRunner
 from .importer import PywrHydraImporter
 from .util import make_plugins
 from .template import register_template, unregister_template
+
+COMPOSE_FILE = Path(__file__).parent.joinpath('pywr-app-service.yml')
 
 
 def hydra_app(category='import'):
@@ -101,7 +104,8 @@ def run(obj, network_id, scenario_id):
 @click.pass_obj
 @click.argument('docker-image', type=str)
 @click.argument('docker-tag', type=str)
-def register(obj, docker_image, docker_tag):
+@click.argument('docker-volume', type=str)
+def register(obj, docker_image, docker_tag, docker_volume):
     """ Register the app with the Hydra installation. """
     import hydra_base
 
@@ -127,11 +131,22 @@ def register(obj, docker_image, docker_tag):
             reparsed = parseString(ET.tostring(element, 'utf-8'))
             fh.write(reparsed.toprettyxml(indent="\t"))
 
+        # Create the docker files needed.
+        destination = Path(plugin_path).joinpath(COMPOSE_FILE.name)
+        copyfile(COMPOSE_FILE, destination)
+        
+        with open(os.path.join(plugin_path, '.env'), 'w') as fh:
+            fh.writelines([
+                f'HYDRA_PYWR_IMAGE_NAME={docker_image}\n',
+                f'HYDRA_PYWR_IMAGE_TAG={docker_tag}\n',
+                f'HYDRA_VOLUME={docker_volume}\n'
+            ])
+
         # We also need to write a very basic script to run the command
         with open(os.path.join(plugin_path, 'run.sh'), 'w') as fh:
             fh.writelines([
                 '#!/bin/bash\n',
-                f'docker run -t {docker_image}:{docker_tag} hydra-pywr "$@"\n',
+                f'docker-compose -f pywr-app-service.yml run pywr-app hydra-pywr "$@"\n'
             ])
 
 
