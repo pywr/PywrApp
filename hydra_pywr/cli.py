@@ -20,14 +20,14 @@ def hydra_app(category='import'):
     return hydra_app_decorator
 
 
-def get_client(hostname, session):
-    return JSONConnection(app_name='Pywr Hydra App', db_url=hostname, session_id=session)
+def get_client(hostname, **kwargs):
+    return JSONConnection(app_name='Pywr Hydra App', db_url=hostname, **kwargs)
 
 
-def get_logged_in_client(context):
+def get_logged_in_client(context, user_id=None):
     session = context['session']
-    client = get_client(context['hostname'], session)
-    if session is None:
+    client = get_client(context['hostname'], session_id=session, user_id=user_id)
+    if client.user_id is None:
         client.login(username=context['username'], password=context['password'])
     return client
 
@@ -56,9 +56,10 @@ def cli(obj, username, password, hostname, session):
 @click.pass_obj
 @click.argument('filename', type=click.Path(file_okay=True, dir_okay=False, exists=True))
 @click.argument('project_id', type=int)
-def import_json(obj, filename, project_id):
+@click.option('-u', '--user-id', type=int, default=None)
+def import_json(obj, filename, project_id, user_id):
     """ Import a Pywr JSON file into Hydra. """
-    client = get_logged_in_client(obj)
+    client = get_logged_in_client(obj, user_id=user_id)
     importer = PywrHydraImporter.from_client(client, filename)
     importer.import_data(client, project_id)
 
@@ -69,11 +70,12 @@ def import_json(obj, filename, project_id):
 @click.argument('filename', type=click.Path(file_okay=True, dir_okay=False))
 @click.option('-n', '--network-id', type=int, default=None)
 @click.option('-s', '--scenario-id', type=int, default=None)
+@click.option('-u', '--user-id', type=int, default=None)
 @click.option('--json-indent', type=int, default=2)
 @click.option('--json-sort-keys', type=int, default=True)
-def export_json(obj, filename, network_id, scenario_id, json_sort_keys, json_indent):
+def export_json(obj, filename, network_id, scenario_id, user_id, json_sort_keys, json_indent):
     """ Export a Pywr JSON from Hydra. """
-    client = get_logged_in_client(obj)
+    client = get_logged_in_client(obj, user_id=user_id)
     exporter = PywrHydraExporter.from_network_id(client, network_id, scenario_id)
 
     with open(filename, mode='w') as fh:
@@ -85,10 +87,11 @@ def export_json(obj, filename, network_id, scenario_id, json_sort_keys, json_ind
 @click.pass_obj
 @click.option('-n', '--network-id', type=int, default=None)
 @click.option('-s', '--scenario-id', type=int, default=None)
-def run(obj, network_id, scenario_id):
+@click.option('-u', '--user-id', type=int, default=None)
+def run(obj, network_id, scenario_id, user_id):
     """ Export, run and save a Pywr model from Hydra. """
 
-    client = get_logged_in_client(obj)
+    client = get_logged_in_client(obj, user_id=user_id)
     runner = PywrHydraRunner.from_network_id(client, network_id, scenario_id)
 
     runner.load_pywr_model()

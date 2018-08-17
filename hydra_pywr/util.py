@@ -7,6 +7,7 @@ from xml.etree import ElementTree as ET
 ARGTYPES = {
     'network_id': 'network',
     'scenario_id': 'scenario',
+    'user_id': 'user'
 }
 
 
