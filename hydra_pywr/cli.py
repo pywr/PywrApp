@@ -12,8 +12,6 @@ from .importer import PywrHydraImporter
 from .util import make_plugins
 from .template import register_template, unregister_template
 
-COMPOSE_FILE = Path(__file__).parent.joinpath('pywr-app-service.yml')
-
 
 def hydra_app(category='import'):
     def hydra_app_decorator(func):
@@ -104,16 +102,15 @@ def run(obj, network_id, scenario_id):
 @click.pass_obj
 @click.argument('docker-image', type=str)
 @click.argument('docker-tag', type=str)
-@click.argument('docker-volume', type=str)
-def register(obj, docker_image, docker_tag, docker_volume):
+def register(obj, docker_image, docker_tag):
     """ Register the app with the Hydra installation. """
     import hydra_base
 
-    plugins = make_plugins(cli)
+    plugins = make_plugins(cli, '{}:{}'.format(docker_image, docker_tag))
 
     base_plugin_dir = Path(hydra_base.config.get('plugin', 'default_directory'))
 
-    base_plugin_dir = base_plugin_dir.joinpath(f'pywr-{docker_tag}')
+    base_plugin_dir = base_plugin_dir.joinpath('{}-{}'.format(docker_image.replace('/', '-'), docker_tag))
 
     if not base_plugin_dir.exists():
         base_plugin_dir.mkdir(parents=True, exist_ok=True)
@@ -121,33 +118,12 @@ def register(obj, docker_image, docker_tag, docker_volume):
     for name, element in plugins:
         plugin_path = os.path.join(base_plugin_dir, name)
 
-        if name not in ('import', 'export', 'run'):
-            continue  # Only reigster whitelisted commands
-
         if not os.path.exists(plugin_path):
             os.mkdir(plugin_path)
 
         with open(os.path.join(plugin_path, 'plugin.xml'), 'w') as fh:
             reparsed = parseString(ET.tostring(element, 'utf-8'))
             fh.write(reparsed.toprettyxml(indent="\t"))
-
-        # Create the docker files needed.
-        destination = Path(plugin_path).joinpath(COMPOSE_FILE.name)
-        copyfile(COMPOSE_FILE, destination)
-        
-        with open(os.path.join(plugin_path, '.env'), 'w') as fh:
-            fh.writelines([
-                f'HYDRA_PYWR_IMAGE_NAME={docker_image}\n',
-                f'HYDRA_PYWR_IMAGE_TAG={docker_tag}\n',
-                f'HYDRA_VOLUME={docker_volume}\n'
-            ])
-
-        # We also need to write a very basic script to run the command
-        with open(os.path.join(plugin_path, 'run.sh'), 'w') as fh:
-            fh.writelines([
-                '#!/bin/bash\n',
-                f'docker-compose -f pywr-app-service.yml run pywr-app hydra-pywr "$@"\n'
-            ])
 
 
 @cli.group()

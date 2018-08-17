@@ -1,9 +1,0 @@
-version: '3'
-services:
-  pywr-app:
-    image: ${HYDRA_PYWR_IMAGE_NAME}:${HYDRA_PYWR_IMAGE_TAG}
-    volumes:
-      - ${HYDRA_VOLUME}:/root/.hydra
-    environment:
-      - HYDRA_USERNAME=admin@hydra.org.uk
-      - HYDRA_PASSWORD=P@$$$$W0RD
