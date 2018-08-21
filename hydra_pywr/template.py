@@ -8,9 +8,9 @@ import pywr
 import os
 import json
 import copy
+from .core import data_type_from_field
 
-
-PYWR_PROTECTED_NODE_KEYS = ('name', 'comment', 'type')
+PYWR_PROTECTED_NODE_KEYS = ('name', 'comment', 'type', 'position')
 
 PYWR_ARRAY_RECORDER_ATTRIBUTES = {
     NumpyArrayNodeRecorder: 'simulated_flow',
@@ -99,9 +99,11 @@ def generate_pywr_node_templates(attribute_ids):
             if name in PYWR_PROTECTED_NODE_KEYS:
                 continue
 
+            data_type = data_type_from_field(field)
+
             type_attributes.append({
                 'attr_id': attribute_ids[name],
-                'data_type': 'descriptor',
+                'data_type': data_type,
                 'description': '',
             })
 

@@ -2,9 +2,10 @@ import json
 import warnings
 from past.builtins import basestring
 from .template import PYWR_PROTECTED_NODE_KEYS, pywr_template_name
-from .core import BasePywrHydra
-
+from .core import BasePywrHydra, data_type_from_field
+from pywr.nodes import NodeMeta
 import logging
+from hydra_pywr_data_types import PYWR_DATA_TYPE_MAP
 log = logging.getLogger(__name__)
 
 
@@ -186,7 +187,7 @@ class PywrHydraImporter(BasePywrHydra):
         }
         return scenario
 
-    def attributes_from_nodes(self, dimension='dimensionless'):
+    def attributes_from_nodes(self):
         """ Generator to convert Pywr nodes data in to Hydra attribute data.
 
         This function is intended to be used to convert Pywr components (e.g. recorders, parameters, etc.)  data
@@ -196,21 +197,29 @@ class PywrHydraImporter(BasePywrHydra):
         """
         nodes = self.data['nodes']
 
-        attributes = set()
+        attributes = {}
 
         for node in nodes:
-            for key in node.keys():
-                if key not in PYWR_PROTECTED_NODE_KEYS:
-                    attributes.add(key)
+            node_type = node['type'].lower()
+            node_klass = NodeMeta.node_registry[node_type]
+            schema = node_klass.Schema()
 
-        for attr in sorted(attributes):
+            # Create an attribute for each field in the schema.
+            for name, field in schema.fields.items():
+                if name in PYWR_PROTECTED_NODE_KEYS:
+                    continue
+
+                data_type = data_type_from_field(field)
+                attributes[name] = data_type
+
+        for attr, data_type in sorted(attributes.items()):
             yield {
                 'name': attr,
-                'dimension': dimension,
+                'data_type': data_type,
                 'description': ''
             }
 
-    def attributes_from_meta(self, dimension='dimensionless'):
+    def attributes_from_meta(self):
         """ Generator to convert Pywr timestepper data in to Hydra attribute data. """
 
         for meta_key in ('metadata', 'timestepper'):
@@ -218,7 +227,7 @@ class PywrHydraImporter(BasePywrHydra):
                 # Prefix these names with Pywr JSON section.
                 yield {
                     'name': key,
-                    'dimension': dimension,
+                    'data_type': 'descriptor',
                     'description': ''
                 }
 
@@ -317,23 +326,33 @@ class PywrHydraImporter(BasePywrHydra):
 
         return hydra_nodes, hydra_links, hydra_resource_scenarios
 
-    def generate_node_resource_scenarios(self, pywr_node, attribute_ids, dimension='dimensionless'):
+    def generate_node_resource_scenarios(self, pywr_node, attribute_ids):
         """ Generate resource attribute, resource scenario and datasets for a Pywr node.
 
         """
-        for key in pywr_node.keys():
-            if key in PYWR_PROTECTED_NODE_KEYS:
+        node_type = pywr_node['type'].lower()
+        node_klass = NodeMeta.node_registry[node_type]
+        schema = node_klass.Schema()
+
+        # Create an attribute for each field in the schema.
+        for name, field in schema.fields.items():
+            if name not in pywr_node:
+                continue  # Skip missing fields
+
+            if name in PYWR_PROTECTED_NODE_KEYS:
                 continue
             # Non-protected keys represent data that must be added to Hydra.
 
+            data_type = data_type_from_field(field)
+
             # Key is the attribute name. The attributes need to already by added to the
             # database and hence have a valid id.
-            attribute_id = attribute_ids[key]
+            attribute_id = attribute_ids[name]
 
-            yield self._make_dataset_resource_attribute_and_scenario(key, pywr_node[key], attribute_id,
-                                                                     encode_to_json=True, dimension=dimension)
+            yield self._make_dataset_resource_attribute_and_scenario(name, pywr_node[name], data_type,
+                                                                     attribute_id, encode_to_json=True)
 
-    def attributes_from_component_dict(self, component_key, dimension='dimensionless'):
+    def attributes_from_component_dict(self, component_key):
         """ Generator to convert Pywr components data in to Hydra attribute data.
 
         This function is intended to be used to convert Pywr components (e.g. recorders, parameters, etc.)  data
@@ -344,10 +363,11 @@ class PywrHydraImporter(BasePywrHydra):
 
         """
         components = self.data[component_key]
+        data_type = PYWR_DATA_TYPE_MAP[component_key]
         for component_name in components.keys():
             yield {
                 'name': component_name,
-                'dimension': dimension,
+                'data_type': data_type.tag,
                 'description': ''
             }
 
@@ -373,9 +393,19 @@ class PywrHydraImporter(BasePywrHydra):
                     # therefore do not add as a attributes as well.
                     continue
 
+            # Determine the data type
+            if component_key in ('parameters', 'recorders'):
+                data_type = PYWR_DATA_TYPE_MAP[component_key].tag
+            else:
+                if component_key == 'timestepper' and component_name == 'timestep':
+                    data_type = 'SCALAR'
+                else:
+                    data_type = 'DESCRIPTOR'
+
             # This the attribute corresponding to the component.
             # It should have a positive id and already be entered in the hydra database.
             attribute_id = attribute_ids[component_name]
 
-            yield self._make_dataset_resource_attribute_and_scenario(component_name, component_data, attribute_id, **kwargs)
+            yield self._make_dataset_resource_attribute_and_scenario(component_name, component_data, data_type,
+                                                                     attribute_id, **kwargs)
 
