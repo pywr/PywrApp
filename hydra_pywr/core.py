@@ -1,6 +1,6 @@
 import json
 from hydra_base.lib.HydraTypes.Types import Scalar, Array
-from hydra_pywr_data_types import PywrParameter, PywrRecorder
+from hydra_pywr_data_types import PywrParameter, PywrRecorder, PYWR_DATA_TYPE_MAP
 from pywr.schema.fields import ParameterField, ParameterReferenceField, ParameterValuesField
 from marshmallow.fields import Number, Integer, List
 
@@ -20,6 +20,19 @@ def data_type_from_field(field):
     else:
         raise ValueError('No data type found for field: {}'.format(field))
 
+    return data_type
+
+
+def data_type_from_component(component_group, component_name):
+    # Determine the data type
+    if component_group in ('parameters', 'recorders'):
+        data_type = PYWR_DATA_TYPE_MAP[component_group].tag
+    else:
+        if component_group == 'timestepper' and component_name == 'timestep':
+            data_type = 'SCALAR'
+        else:
+            data_type = 'DESCRIPTOR'
+            
     return data_type
 
 

@@ -56,7 +56,7 @@ def generate_pywr_attributes():
     for name in PYWR_TIMESTEPPER_ATTRIBUTES:
         if name not in attribute_names:
             yield {
-                'name': name,
+                'name': 'timestepper.{}'.format(name),
                 'dimension': 'dimensionless',
                 'description': ''
             }
@@ -150,7 +150,7 @@ def generate_pywr_template(attribute_ids, default_data_set_ids):
             'resource_type': 'NETWORK',
             'typeattrs': [
                 {
-                    'attr_id': attribute_ids[name],
+                    'attr_id': attribute_ids['timestepper.{}'.format(name)],
                     'data_type': 'descriptor' if name != 'timestep' else 'scalar',
                     'description': '',
                     'default_dataset_id': default_data_set_ids[name],

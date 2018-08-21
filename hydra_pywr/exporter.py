@@ -1,15 +1,14 @@
 import json
 from past.builtins import basestring
 from .template import pywr_template_name, PYWR_TIMESTEPPER_ATTRIBUTES
-from .core import BasePywrHydra
+from .core import BasePywrHydra, PywrParameter, PywrRecorder
 
 
 class PywrHydraExporter(BasePywrHydra):
-    def __init__(self, data, attributes, attribute_group_items, template):
+    def __init__(self, data, attributes, template):
         super().__init__()
         self.data = data
         self.attributes = attributes
-        self.attribute_group_items = attribute_group_items
         self.template = template
 
     @classmethod
@@ -20,18 +19,9 @@ class PywrHydraExporter(BasePywrHydra):
         attributes = client.get_attributes()
         attributes = {attr.id: attr for attr in attributes}
 
-        # Fetch all the attribute group items for this network
-        attribute_group_items = client.get_network_attributegroup_items(network_id)
-
-        # # TODO this can be removed when JSONObject is fixed to load the group data from within the group item.
-        for attribute_group_item in attribute_group_items:
-            group = client.get_attribute_group(attribute_group_item['group_id'])
-            assert group['id'] == attribute_group_item['group_id']
-            attribute_group_item['group'] = group
-
         # We also need the template to get the node types
         template = client.get_template_by_name(pywr_template_name())
-        return cls(network, attributes, attribute_group_items, template)
+        return cls(network, attributes, template)
 
     def get_pywr_data(self):
 
@@ -66,40 +56,6 @@ class PywrHydraExporter(BasePywrHydra):
         pywr_data['edges'] = edges
 
         return pywr_data
-
-    def _get_attribute_group_from_name(self, group_name):
-
-        for attribute_group_item in self.attribute_group_items:
-            group = attribute_group_item['group']
-            if group['name'] == group_name:
-                return group
-
-        raise ValueError('No attribute group found for group name: {}'.format(group_name))
-
-    def _get_attributes_for_group_from_name(self, group_name):
-
-        attributes_found = set()
-
-        # Special case for timestepper where the PYWR_TIMESTEPPER ATTRIBUTES are found
-        # to be in the "timestepper" group regardless of the mappings in the database.
-        # This is a work around until there is improved template support for groups in hydra.
-        if group_name == 'timestepper':
-            for attribute_id, attribute in self.attributes.items():
-                if attribute['name'] in PYWR_TIMESTEPPER_ATTRIBUTES:
-                    if attribute_id not in attributes_found:
-                        attributes_found.add(attribute_id)
-                        yield attribute
-
-        try:
-            group = self._get_attribute_group_from_name(group_name)
-        except ValueError:
-            pass
-        else:
-            for attribute_group_item in self.attribute_group_items:
-                if attribute_group_item['group_id'] == group['id']:
-                    if attribute_group_item['attr_id'] not in attributes_found:
-                        attributes_found.add(attribute_group_item['attr_id'])
-                        yield self.attributes[attribute_group_item['attr_id']]
 
     def _get_resource_scenario(self, resource_attribute_id):
 
@@ -179,24 +135,27 @@ class PywrHydraExporter(BasePywrHydra):
     def generate_group_data(self, group_name, decode_from_json=False):
         """ Generator returning a key and dict value for meta keys. """
 
-        # These are all the attributes associated with the group
-        group_attributes = list(self._get_attributes_for_group_from_name(group_name))
-
         for resource_attribute in self.data['attributes']:
 
             attribute = self.attributes[resource_attribute['attr_id']]
             attribute_name = attribute['name']
 
-            for group_attribute in group_attributes:
-                # Find if this attribute is in this group
-                if group_attribute['id'] == attribute['id']:
-                    break
-            else:
-                continue  # Filter out keys not associated the group
-
             resource_scenario = self._get_resource_scenario(resource_attribute['id'])
             dataset = resource_scenario['dataset']
             value = dataset['value']
+
+            data_type = dataset['type']
+
+            if group_name == 'parameters':
+                if data_type != PywrParameter.tag:
+                    continue
+            elif group_name == 'recorders':
+                if data_type != PywrRecorder.tag:
+                    continue
+            else:
+                if not attribute_name.startswith('{}.'.format(group_name)):
+                    continue
+                attribute_name = attribute_name.split('.', 1)[-1]
 
             if decode_from_json:
                 value = json.loads(value)
