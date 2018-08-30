@@ -5,7 +5,7 @@ from .template import PYWR_PROTECTED_NODE_KEYS, pywr_template_name
 from .core import BasePywrHydra, data_type_from_field, data_type_from_component
 from pywr.nodes import NodeMeta
 import logging
-from hydra_pywr_data_types import PYWR_DATA_TYPE_MAP
+from hydra_pywr_common import PYWR_DATA_TYPE_MAP
 log = logging.getLogger(__name__)
 
 

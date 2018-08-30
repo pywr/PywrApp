@@ -1,6 +1,6 @@
 import json
 from hydra_base.lib.HydraTypes.Types import Scalar, Array
-from hydra_pywr_data_types import PywrParameter, PywrRecorder, PYWR_DATA_TYPE_MAP
+from hydra_pywr_common import PywrParameter, PywrRecorder, PYWR_DATA_TYPE_MAP
 from pywr.schema.fields import ParameterField, ParameterReferenceField, ParameterValuesField
 from marshmallow.fields import Number, Integer, List
 
