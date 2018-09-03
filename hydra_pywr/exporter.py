@@ -2,6 +2,8 @@ import json
 from past.builtins import basestring
 from .template import pywr_template_name, PYWR_TIMESTEPPER_ATTRIBUTES
 from .core import BasePywrHydra, PywrParameter, PywrRecorder
+from pywr.nodes import NodeMeta
+from hydra_base.lib.HydraTypes.Registry import typemap
 
 
 class PywrHydraExporter(BasePywrHydra):
@@ -46,8 +48,18 @@ class PywrHydraExporter(BasePywrHydra):
                     pywr_data[group_name] = group_data
 
         nodes = []
-        for node in self.generate_pywr_nodes():
+        for node, parameters, recorders in self.generate_pywr_nodes():
             nodes.append(node)
+
+            if len(parameters) > 0:
+                if 'parameters' not in pywr_data:
+                    pywr_data['parameters'] = {}
+                pywr_data['parameters'].update(parameters)
+
+            if len(recorders) > 0:
+                if 'recorders' not in pywr_data:
+                    pywr_data['recorders'] = {}
+                pywr_data['recorders'].update(recorders)
         pywr_data['nodes'] = nodes
 
         edges = []
@@ -79,6 +91,8 @@ class PywrHydraExporter(BasePywrHydra):
         """ Generator returning a Pywr dict for each node in the network. """
 
         for node in self.data['nodes']:
+            parameters = {}
+            recorders = {}
 
             # Create the basic information.
             pywr_node = {'name': node['name']}
@@ -95,6 +109,9 @@ class PywrHydraExporter(BasePywrHydra):
             if pywr_node_type is None:
                 raise ValueError('Template does not contain node of type "{}".'.format(pywr_node_type))
 
+            node_klass = NodeMeta.node_registry[pywr_node_type]
+            schema = node_klass.Schema()
+
             pywr_node['type'] = pywr_node_type
 
             # Then add any corresponding attributes / data
@@ -108,13 +125,33 @@ class PywrHydraExporter(BasePywrHydra):
                 if resource_attribute['attr_is_var'] == 'Y':
                     continue
 
+                attribute_name = attribute['name']
+
                 dataset = resource_scenario['dataset']
+                dataset_type = dataset['type']
                 value = dataset['value']
 
-                if isinstance(value, basestring):
-                    pywr_node[attribute['name']] = json.loads(value)
+                if attribute_name in schema.fields:
+                    # The attribute is part of the node definition
+                    if isinstance(value, basestring):
+                        pywr_node[attribute_name] = json.loads(value)
+                    else:
+                        pywr_node[attribute_name] = value
                 else:
-                    pywr_node[attribute['name']] = value
+                    # Otherwise the attribute is either a parameter or recorder
+                    # defined as a node attribute (for convenience).
+                    hydra_type = typemap[dataset_type]
+                    component_name = self.make_node_attribute_component_name(node['name'], attribute_name)
+                    if issubclass(hydra_type, PywrParameter):
+                        # Must be a parameter
+                        parameters[component_name] = json.loads(value)
+                    elif issubclass(hydra_type, PywrRecorder):
+                        # Must be a recorder
+                        recorders[component_name] = json.loads(value)
+                    else:
+                        # Any other type we do not support as a non-schema nodal attribute
+                        raise ValueError('Hydra dataset type "{}" not supported as a non-schema'
+                                         ' attribute on a Pywr node.'.format(dataset_type))
 
             if node['x'] is not None and node['y'] is not None:
                 # Finally add coordinates from hydra
@@ -122,7 +159,7 @@ class PywrHydraExporter(BasePywrHydra):
                     pywr_node['position'] = {}
                 pywr_node['position'].update({'geographic': [node['x'], node['y']]})
 
-            yield pywr_node
+            yield pywr_node, parameters, recorders
 
     def generate_pywr_edges(self):
         """ Generator returning a Pywr tuple for each link/edge in the network. """

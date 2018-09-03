@@ -37,6 +37,9 @@ def data_type_from_component(component_group, component_name):
 
 
 class BasePywrHydra:
+    _node_attribute_component_affix = '__'
+    _node_attribute_component_delimiter = ':'
+
     def __init__(self):
         # Default internal variables
         self.next_resource_attribute_id = -1
@@ -82,3 +85,24 @@ class BasePywrHydra:
         # Finally return resource attribute and resource scenario
         return resource_attribute, resource_scenario
 
+    @classmethod
+    def is_component_a_node_attribute(cls, component_name, node_name=None):
+        """Test whether a component's name should be inferred as a node level attribute in Hydra. """
+        if node_name is None:
+            # This should probably be done with regex
+            if cls._node_attribute_component_delimiter not in component_name:
+                return False
+
+            prefix, _ = component_name.split(cls._node_attribute_component_delimiter, 1)
+            return prefix.startswith(cls._node_attribute_component_affix) and \
+                prefix.endswith(cls._node_attribute_component_affix)
+        else:
+            # Test that it is exactly true
+            prefix = '{affix}{name}{affix}'.format(affix=cls._node_attribute_component_affix, name=node_name)
+            return component_name.startswith(prefix)
+
+    @classmethod
+    def make_node_attribute_component_name(cls, node_name, attribute_name):
+        """Return the component name to use in Pywr for node level attribute. """
+        prefix = '{affix}{name}{affix}'.format(affix=cls._node_attribute_component_affix, name=node_name)
+        return cls._node_attribute_component_delimiter.join((prefix, attribute_name))

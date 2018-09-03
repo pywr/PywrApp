@@ -1,0 +1,62 @@
+{
+    "metadata": {
+        "title": "Hydra generated",
+        "description": "An example of all ",
+        "minimum_version": "0.1"
+    },
+    "timestepper": {
+        "start": "2015-01-01",
+        "end": "2015-12-31",
+        "timestep": 1
+    },
+    "nodes": [
+        {
+            "name": "supply1",
+            "type": "Input",
+            "max_flow": "__supply1__:supply_max_flow",
+            "cost": {
+                "type": "constant",
+                "value": 0.0
+            }
+        },
+        {
+            "name": "link1",
+            "type": "link",
+            "max_flow": {
+                "name": "link_max_flow",
+                "type": "constant",
+                "value": 9999
+            }
+        },
+        {
+            "name": "demand1",
+            "type": "Output",
+            "max_flow": 10,
+            "cost": "demand_cost"
+        }
+    ],
+    "parameters": {
+        "__supply1__:aconstant": {
+          "type": "constant",
+          "value": 5
+        },
+        "__supply1__:supply_max_flow": {
+            "type": "constant",
+            "value": 125.0
+        },
+        "demand_cost": {
+            "type": "constant",
+            "value": -10
+        }
+    },
+    "recorders": {
+        "__demand1__:simulated_flow": {
+            "type": "numpyarraynoderecorder",
+            "node": "demand1"
+        }
+    },
+    "edges": [
+        ["supply1", "link1"],
+        ["link1", "demand1"]
+    ]
+}

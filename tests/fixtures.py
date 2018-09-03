@@ -33,6 +33,7 @@ def simple1(model_directory):
     'simple1.json',
     'reservoir2.json',
     'parameter_reference.json',
+    'hydra_generated.json'
 ])
 def pywr_json_filename(request, model_directory):
     return os.path.join(model_directory, request.param)

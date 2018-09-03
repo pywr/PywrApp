@@ -285,6 +285,16 @@ class PywrHydraImporter(BasePywrHydra):
         return hydra_nodes, hydra_links, hydra_resource_scenarios
 
     def generate_node_resource_scenarios(self, pywr_node, attribute_ids):
+
+        for ra, rs in self.generate_node_schema_resource_scenarios(pywr_node, attribute_ids):
+            yield ra, rs
+
+        for component_key in ('parameters', 'recorders'):
+            for ra, rs in self.generate_node_component_resource_scenarios(pywr_node, component_key,
+                                                                          attribute_ids, encode_to_json=True):
+                yield ra, rs
+
+    def generate_node_schema_resource_scenarios(self, pywr_node, attribute_ids):
         """ Generate resource attribute, resource scenario and datasets for a Pywr node.
 
         """
@@ -310,9 +320,36 @@ class PywrHydraImporter(BasePywrHydra):
             yield self._make_dataset_resource_attribute_and_scenario(name, pywr_node[name], data_type,
                                                                      attribute_id, encode_to_json=True)
 
+    def generate_node_component_resource_scenarios(self, pywr_node, component_key, attribute_ids, **kwargs):
+
+        try:
+            components = self.data[component_key]
+        except KeyError:
+            components = {}
+
+        node_name = pywr_node['name']
+
+        for component_name, component_data in components.items():
+            # Filter components to only include those that should be stored at the node level
+            if not self.is_component_a_node_attribute(component_name, node_name):
+                continue
+
+            # TODO This needs to map the appropriate hydra type and fallback to a generic type if not implemented.
+            data_type = PYWR_DATA_TYPE_MAP[component_key].tag
+            attribute_name = self._attribute_name(component_key, component_name)
+
+            # This the attribute corresponding to the component.
+            # It should have a positive id and already be entered in the hydra database.
+            attribute_id = attribute_ids[attribute_name]
+            yield self._make_dataset_resource_attribute_and_scenario(attribute_name, component_data, data_type,
+                                                                     attribute_id, **kwargs)
+
     def _attribute_name(self, component_key, component_name):
         if component_key in ('parameters', 'recorders'):
-            attribute_name = component_name
+            if self._node_attribute_component_delimiter in component_name:
+                attribute_name = component_name.split(self._node_attribute_component_delimiter, 1)[-1]
+            else:
+                attribute_name = component_name
         else:
             attribute_name = '{}.{}'.format(component_key, component_name)
         return attribute_name
@@ -360,8 +397,14 @@ class PywrHydraImporter(BasePywrHydra):
                     # therefore do not add as a attributes as well.
                     continue
 
+            # Determine whether this component should be store on as a node attribute.
+            if component_key in ('parameters', 'recorders') and \
+                    self.is_component_a_node_attribute(component_name):
+                continue
+
             # Determine the data type
             if component_key in ('parameters', 'recorders'):
+                # TODO This needs to map the appropriate hydra type and fallback to a generic type if not implemented.
                 data_type = PYWR_DATA_TYPE_MAP[component_key].tag
             else:
                 if component_key == 'timestepper' and component_name == 'timestep':
