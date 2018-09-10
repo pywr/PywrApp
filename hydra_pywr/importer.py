@@ -2,10 +2,10 @@ import json
 import warnings
 from past.builtins import basestring
 from .template import PYWR_PROTECTED_NODE_KEYS, pywr_template_name
-from .core import BasePywrHydra, data_type_from_field, data_type_from_component
+from .core import BasePywrHydra, data_type_from_field
 from pywr.nodes import NodeMeta
+from hydra_pywr_common import data_type_from_component_type
 import logging
-from hydra_pywr_common import PYWR_DATA_TYPE_MAP
 log = logging.getLogger(__name__)
 
 
@@ -155,7 +155,7 @@ class PywrHydraImporter(BasePywrHydra):
         """
         nodes = self.data['nodes']
 
-        attributes = {}
+        attributes = set()
 
         for node in nodes:
             node_type = node['type'].lower()
@@ -166,14 +166,11 @@ class PywrHydraImporter(BasePywrHydra):
             for name, field in schema.fields.items():
                 if name in PYWR_PROTECTED_NODE_KEYS:
                     continue
+                attributes.add(name)
 
-                data_type = data_type_from_field(field)
-                attributes[name] = data_type
-
-        for attr, data_type in sorted(attributes.items()):
+        for attr in sorted(attributes):
             yield {
                 'name': attr,
-                'data_type': data_type,
                 'description': ''
             }
 
@@ -185,7 +182,6 @@ class PywrHydraImporter(BasePywrHydra):
                 # Prefix these names with Pywr JSON section.
                 yield {
                     'name': '{}.{}'.format(meta_key, key),
-                    'data_type': 'descriptor',
                     'description': ''
                 }
 
@@ -310,7 +306,6 @@ class PywrHydraImporter(BasePywrHydra):
             if name in PYWR_PROTECTED_NODE_KEYS:
                 continue
             # Non-protected keys represent data that must be added to Hydra.
-
             data_type = data_type_from_field(field)
 
             # Key is the attribute name. The attributes need to already by added to the
@@ -334,8 +329,7 @@ class PywrHydraImporter(BasePywrHydra):
             if not self.is_component_a_node_attribute(component_name, node_name):
                 continue
 
-            # TODO This needs to map the appropriate hydra type and fallback to a generic type if not implemented.
-            data_type = PYWR_DATA_TYPE_MAP[component_key].tag
+            data_type = data_type_from_component_type(component_key, component_data['type']).tag
             attribute_name = self._attribute_name(component_key, component_name)
 
             # This the attribute corresponding to the component.
@@ -365,13 +359,11 @@ class PywrHydraImporter(BasePywrHydra):
 
         """
         components = self.data[component_key]
-        data_type = PYWR_DATA_TYPE_MAP[component_key]
         for component_name in components.keys():
             attribute_name = self._attribute_name(component_key, component_name)
 
             yield {
                 'name': attribute_name,
-                'data_type': data_type.tag,
                 'description': ''
             }
 
@@ -404,8 +396,7 @@ class PywrHydraImporter(BasePywrHydra):
 
             # Determine the data type
             if component_key in ('parameters', 'recorders'):
-                # TODO This needs to map the appropriate hydra type and fallback to a generic type if not implemented.
-                data_type = PYWR_DATA_TYPE_MAP[component_key].tag
+                data_type = data_type_from_component_type(component_key, component_data['type']).tag
             else:
                 if component_key == 'timestepper' and component_name == 'timestep':
                     data_type = 'SCALAR'

@@ -1,7 +1,8 @@
 import json
 from past.builtins import basestring
 from .template import pywr_template_name, PYWR_TIMESTEPPER_ATTRIBUTES
-from .core import BasePywrHydra, PywrParameter, PywrRecorder
+from .core import BasePywrHydra
+from hydra_pywr_common import PywrParameter, PywrRecorder
 from pywr.nodes import NodeMeta
 from hydra_base.lib.HydraTypes.Registry import typemap
 

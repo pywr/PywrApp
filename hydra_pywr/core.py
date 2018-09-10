@@ -1,15 +1,17 @@
 import json
-from hydra_base.lib.HydraTypes.Types import Scalar, Array
-from hydra_pywr_common import PywrParameter, PywrRecorder, PYWR_DATA_TYPE_MAP
-from pywr.schema.fields import ParameterField, ParameterReferenceField, ParameterValuesField
+from hydra_base.lib.HydraTypes.Types import Scalar, Array, Descriptor
+from pywr.schema.fields import ParameterField, ParameterReferenceField, ParameterValuesField, NodeField
 from marshmallow.fields import Number, Integer, List
 
 
+# TODO move this to template.py
 def data_type_from_field(field):
     """ Return the appropriate Hydra DataType for a given node's attribute. """
 
     if isinstance(field, (ParameterReferenceField, ParameterField)):
-        data_type = PywrParameter.tag
+        data_type = Descriptor.tag
+    elif isinstance(field, NodeField):
+        data_type = Descriptor.tag
     elif isinstance(field, ParameterValuesField):
         # TODO support this data type properly.
         data_type = Scalar.tag
@@ -20,19 +22,6 @@ def data_type_from_field(field):
     else:
         raise ValueError('No data type found for field: {}'.format(field))
 
-    return data_type
-
-
-def data_type_from_component(component_group, component_name):
-    # Determine the data type
-    if component_group in ('parameters', 'recorders'):
-        data_type = PYWR_DATA_TYPE_MAP[component_group].tag
-    else:
-        if component_group == 'timestepper' and component_name == 'timestep':
-            data_type = 'SCALAR'
-        else:
-            data_type = 'DESCRIPTOR'
-            
     return data_type
 
 
