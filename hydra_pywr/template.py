@@ -25,6 +25,8 @@ PYWR_DEFAULT_DATASETS = {
     'timestep': {'data_type': 'scalar', 'val': 1, 'units': 'days', 'name': 'Default timestep'},
 }
 
+CONFIG_DIR = os.path.join(os.path.dirname(__file__), 'template_configs')
+
 
 def _load_layouts():
     with open(os.path.join(os.path.dirname(__file__), 'node_layouts.json')) as fh:
@@ -43,9 +45,10 @@ def get_layout(node_klass):
     return layout
 
 
-def pywr_template_name():
+def pywr_template_name(config_name):
     """ The name of the Hydra template for Pywr. """
-    return 'Pywr template (version: {}, git hash: {})'.format(pywr.__version__, pywr.__git_hash__[:6])
+    return 'Pywr {} template (version: {}, git hash: {})'.format(config_name, pywr.__version__,
+                                                                 pywr.__git_hash__[:6])
 
 
 def generate_pywr_attributes():
@@ -88,12 +91,21 @@ def generate_pywr_attributes():
                 attribute_names.add(name)
 
 
-def generate_pywr_node_templates(attribute_ids):
+def generate_pywr_node_templates(attribute_ids, whitelist=None, blacklist=None):
 
     for node_name, node_klass in NodeMeta.node_registry.items():
         if node_klass == Node:
             # Don't add the basic abstract node from Pywr.
             continue
+
+        # Skip non-whitelisted or blacklisted nodes
+        if whitelist is not None:
+            if node_name.lower() not in whitelist:
+                continue
+        if blacklist is not None:
+            if node_name.lower() in blacklist:
+                continue
+
         schema = node_klass.Schema()
 
         # Create an attribute for each field in the schema.
@@ -128,7 +140,6 @@ def generate_pywr_node_templates(attribute_ids):
 
         # Now create the layout
         layout = get_layout(node_klass)
-        print(layout)
 
         yield {
             'name': node_name,
@@ -138,7 +149,9 @@ def generate_pywr_node_templates(attribute_ids):
         }
 
 
-def generate_pywr_template(attribute_ids, default_data_set_ids):
+def generate_pywr_template(attribute_ids, default_data_set_ids, config_name):
+
+    config = load_template_config(config_name)
 
     template_types = [
         {
@@ -164,12 +177,21 @@ def generate_pywr_template(attribute_ids, default_data_set_ids):
         }
     ]
 
-    for t in generate_pywr_node_templates(attribute_ids):
+    # Get any white or black listed nodes from the template configuration.
+    node_whitelist = config['nodes'].get('whitelist', None)
+    if node_whitelist is not None:
+        node_whitelist = [n.lower() for n in node_whitelist]
+    node_blacklist = config['nodes'].get('blacklist', None)
+    if node_blacklist is not None:
+        node_blacklist = [n.lower() for n in node_blacklist]
+    #
+    for t in generate_pywr_node_templates(attribute_ids, whitelist=node_whitelist,
+                                          blacklist=node_blacklist):
         template_types.append(t)
 
     # TODO add layout
     template = {
-        'name': pywr_template_name(),
+        'name': pywr_template_name(config['name']),
         'templatetypes': template_types,
     }
 
@@ -185,7 +207,7 @@ def add_default_datasets(client):
     return default_data_set_ids
 
 
-def register_template(client):
+def register_template(client, config_name='full'):
     """ Register the template with Hydra. """
 
     # TODO check to see if the template exists first.
@@ -200,12 +222,20 @@ def register_template(client):
     # Convert to a simple dict for local processing.
     attribute_ids = {a.name: a.id for a in response_attributes}
 
-    template = generate_pywr_template(attribute_ids, default_data_set_ids)
+    template = generate_pywr_template(attribute_ids, default_data_set_ids, config_name)
 
     client.add_template(template)
 
 
-def unregister_template(client):
+def unregister_template(client, config_name='full'):
     """ Unregister the template with Hydra. """
-    template = client.get_template_by_name(pywr_template_name())
+
+    config = load_template_config(config_name)
+    template = client.get_template_by_name(pywr_template_name(config['name']))
     client.delete_template(template['id'])
+
+
+def load_template_config(config_name):
+    with open(os.path.join(CONFIG_DIR, '{}.json'.format(config_name))) as fh:
+        config = json.load(fh)
+    return config

@@ -24,7 +24,7 @@ def test_export(session_with_pywr_network, root_user_id):
     attributes = {attr.id: JSONObject(attr) for attr in attributes}
 
     # We also need the template to get the node types
-    template = JSONObject(hydra_base.get_template_by_name(pywr_template_name()))
+    template = JSONObject(hydra_base.get_template_by_name(pywr_template_name('Full')))
 
     exporter = PywrHydraExporter(network, attributes, template)
 

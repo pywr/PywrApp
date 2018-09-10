@@ -29,8 +29,8 @@ class PywrHydraImporter(BasePywrHydra):
         self.next_node_id = -1
 
     @classmethod
-    def from_client(cls, client, data):
-        template = client.get_template_by_name(pywr_template_name())
+    def from_client(cls, client, data, config_name):
+        template = client.get_template_by_name(pywr_template_name(config_name))
         return cls(data, template)
 
     @property

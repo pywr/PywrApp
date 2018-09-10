@@ -23,8 +23,8 @@ class PywrHydraExporter(BasePywrHydra):
         attributes = {attr.id: attr for attr in attributes}
 
         # We also need the template to get the node types
-        template = client.get_template_by_name(pywr_template_name())
-        return cls(network, attributes, template)
+        #template = client.get_template_by_name(pywr_template_name())
+        return cls(network, attributes, None)
 
     def get_pywr_data(self):
 
@@ -104,9 +104,7 @@ class PywrHydraExporter(BasePywrHydra):
             # Get the type for this node from the template
             pywr_node_type = None
             for node_type in node['types']:
-                for template_type in self.template['templatetypes']:
-                    if node_type['id'] == template_type['id']:
-                        pywr_node_type = template_type['name']
+                pywr_node_type = node_type['name']
             if pywr_node_type is None:
                 raise ValueError('Template does not contain node of type "{}".'.format(pywr_node_type))
 

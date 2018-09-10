@@ -43,7 +43,7 @@ def pywr_json_filename(request, model_directory):
 def session_with_pywr_network(pywr_json_filename, session_with_pywr_template, projectmaker, root_user_id):
     project = projectmaker.create()
 
-    template = JSONObject(hydra_base.get_template_by_name(pywr_template_name()))
+    template = JSONObject(hydra_base.get_template_by_name(pywr_template_name('Full')))
 
     importer = PywrHydraImporter(pywr_json_filename, template)
 
@@ -74,7 +74,7 @@ def db_with_pywr_network(pywr_json_filename, db_with_template, projectmaker, log
 
     project = projectmaker.create()
 
-    importer = PywrHydraImporter.from_client(client, pywr_json_filename)
+    importer = PywrHydraImporter.from_client(client, pywr_json_filename, 'Full')
     network_id, scenario_id = importer.import_data(client, project.id)
 
     return network_id, scenario_id, pywr_json_filename

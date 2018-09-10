@@ -135,17 +135,19 @@ def template():
 
 
 @template.command('register')
+@click.option('-c', '--config', type=str, default='full')
 @click.pass_obj
-def template_register(obj):
+def template_register(obj, config):
     """ Register a Pywr template with Hydra. """
 
     client = get_logged_in_client(obj)
-    register_template(client)
+    register_template(client, config_name=config)
     
     
 @template.command('unregister')
+@click.option('-c', '--config', type=str, default='full')
 @click.pass_obj
-def template_unregister(obj):
+def template_unregister(obj, config):
     """ Unregister a Pywr template with Hydra. """
     client = get_logged_in_client(obj)
-    unregister_template(client)
+    unregister_template(client, config_name=config)

@@ -121,7 +121,7 @@ def session_with_pywr_template(session):
         hydra_dataset = hydra_base.add_dataset(flush=True, **dataset)
         default_data_set_ids[attribute_name] = hydra_dataset.id
 
-    template = generate_pywr_template(attribute_ids, default_data_set_ids)
+    template = generate_pywr_template(attribute_ids, default_data_set_ids, 'full')
 
     hydra_base.add_template(JSONObject(template))
 

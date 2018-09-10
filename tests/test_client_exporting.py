@@ -42,7 +42,7 @@ def test_create_empty_network(db_with_template, projectmaker, logged_in_client):
     client = logged_in_client
 
     project = projectmaker.create()
-    template = client.get_template_by_name(pywr_template_name())
+    template = client.get_template_by_name(pywr_template_name('Full'))
 
     # Find the network type in this template.
     # There is only one of these in the template.

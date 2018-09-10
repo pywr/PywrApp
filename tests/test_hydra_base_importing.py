@@ -14,7 +14,7 @@ import json
 def test_add_network(pywr_json_filename, session_with_pywr_template, projectmaker, root_user_id):
     project = projectmaker.create()
 
-    template = JSONObject(hydra_base.get_template_by_name(pywr_template_name()))
+    template = JSONObject(hydra_base.get_template_by_name(pywr_template_name('Full')))
 
     importer = PywrHydraImporter(pywr_json_filename, template)
 
@@ -54,6 +54,6 @@ def test_add_template(session, root_user_id):
         hydra_dataset = hydra_base.add_dataset(flush=True, **dataset)
         default_data_set_ids[attribute_name] = hydra_dataset.id    
 
-    template = generate_pywr_template(attribute_ids, default_data_set_ids)
+    template = generate_pywr_template(attribute_ids, default_data_set_ids, 'full')
 
     hydra_base.add_template(JSONObject(template))
