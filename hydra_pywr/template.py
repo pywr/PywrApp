@@ -91,6 +91,9 @@ def generate_pywr_attributes():
 def generate_pywr_node_templates(attribute_ids):
 
     for node_name, node_klass in NodeMeta.node_registry.items():
+        if node_klass == Node:
+            # Don't add the basic abstract node from Pywr.
+            continue
         schema = node_klass.Schema()
 
         # Create an attribute for each field in the schema.
