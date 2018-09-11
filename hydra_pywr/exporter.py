@@ -179,7 +179,10 @@ class PywrHydraExporter(BasePywrHydra):
             attribute = self.attributes[resource_attribute['attr_id']]
             attribute_name = attribute['name']
 
-            resource_scenario = self._get_resource_scenario(resource_attribute['id'])
+            try:
+                resource_scenario = self._get_resource_scenario(resource_attribute['id'])
+            except ValueError:
+                continue
             dataset = resource_scenario['dataset']
             value = dataset['value']
 
