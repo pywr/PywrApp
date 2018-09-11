@@ -162,7 +162,7 @@ def generate_pywr_template(attribute_ids, default_data_set_ids, config_name):
             'layout': {"linestyle": "solid", "width": "7", "color": "#000000", "hidden": "N"}
         },
         {
-            'name': 'pywr',
+            'name': 'Pywr {}'.format(config_name.capitalize()),
             'resource_type': 'NETWORK',
             'typeattrs': [
                 {
