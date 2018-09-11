@@ -133,7 +133,10 @@ class PywrHydraExporter(BasePywrHydra):
                 if attribute_name in schema.fields:
                     # The attribute is part of the node definition
                     if isinstance(value, basestring):
-                        pywr_node[attribute_name] = json.loads(value)
+                        try:
+                            pywr_node[attribute_name] = json.loads(value)
+                        except json.decoder.JSONDecodeError:
+                            pywr_node[attribute_name] = value
                     else:
                         pywr_node[attribute_name] = value
                 else:
