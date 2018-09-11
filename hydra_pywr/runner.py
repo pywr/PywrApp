@@ -7,16 +7,17 @@ from pywr.recorders.progress import ProgressRecorder
 from .template import PYWR_ARRAY_RECORDER_ATTRIBUTES
 
 
-def generate_node_array_recorders(model):
+def add_node_array_recorders(model):
     """ Helper function to add NumpyArrayXXX recorders to a Pywr model. """
 
     # Add node recorders
     for node in model.nodes:
-        name = '__hydra_recorder__:{}'.format(node.name)
         if isinstance(node, Node):
-            yield NumpyArrayNodeRecorder(model, node, name=name)
+            name = '__{}__:{}'.format(node.name, 'simulated_flow')
+            NumpyArrayNodeRecorder(model, node, name=name)
         elif isinstance(node, Storage):
-            yield NumpyArrayStorageRecorder(model, node, name=name)
+            name = '__{}__:{}'.format(node.name, 'simulated_volume')
+            NumpyArrayStorageRecorder(model, node, name=name)
         else:
             import warnings
             warnings.warn('Unrecognised node subclass "{}" with name "{}". Skipping '
@@ -58,9 +59,12 @@ class PywrHydraRunner(PywrHydraExporter):
         ProgressRecorder(model)
 
         # Add recorders for monitoring the simulated timeseries of nodes
+        add_node_array_recorders(model)
+
         array_recorders = []
-        for recorder in generate_node_array_recorders(model):
-            array_recorders.append(recorder)
+        for recorder in model.recorders:
+            if isinstance(recorder, (NumpyArrayNodeRecorder, NumpyArrayStorageRecorder)):
+                array_recorders.append(recorder)
 
         # Check the model
         model.check()
@@ -80,7 +84,9 @@ class PywrHydraRunner(PywrHydraExporter):
         attribute_id = attribute['id']
 
         for node in self.data['nodes']:
+
             if node['name'] == node_name:
+                print(node_name, node['id'])
                 resource_attributes = node['attributes']
                 break
         else:
@@ -99,16 +105,43 @@ class PywrHydraRunner(PywrHydraExporter):
                 return attribute
         raise ValueError('No attribute with name "{}" found.'.format(name))
 
+    def _get_attribute_name_from_recorder(self, recorder):
+        if recorder.name is None:
+            attribute_name = recorder.__class__
+        else:
+            prefix = '__{}__:'.format(recorder.node.name)
+            suffix = '.{}'.format(recorder.node.name)
+            if recorder.name.startswith(prefix):
+                attribute_name = recorder.name.replace(prefix, '')
+            elif recorder.name.endswith(suffix):
+                attribute_name = recorder.name.replace(suffix, '')
+            else:
+                attribute_name = recorder.name
+        return attribute_name
+
     def save_pywr_results(self, client):
         """ Save the outputs from a Pywr model run to Hydra. """
         scenario = self._copy_scenario()
 
-        for resource_scenario in self.generate_array_recorder_resource_scenarios():
+        # First add any new attributes required
+        attributes = []
+        for recorder in self._array_recorders:
+            attributes.append({
+                'name': self._get_attribute_name_from_recorder(recorder),
+                'description': ''
+            })
+
+        # The response attributes have ids now.
+        response_attributes = client.add_attributes(attributes)
+        # Update the attribute mapping
+        self.attributes.update({attr.id: attr for attr in response_attributes})
+
+        for resource_scenario in self.generate_array_recorder_resource_scenarios(client):
             scenario['resourcescenarios'].append(resource_scenario)
 
         client.update_scenario(scenario)
 
-    def generate_array_recorder_resource_scenarios(self):
+    def generate_array_recorder_resource_scenarios(self, client):
         """ Generate resource scenario data from NumpyArrayXXX recorders. """
         if self._array_recorders is None:
             # TODO turn this on when logging is sorted out.
@@ -120,8 +153,24 @@ class PywrHydraRunner(PywrHydraExporter):
             value = df.to_json()
 
             # Get the attribute and its ID
-            attribute = PYWR_ARRAY_RECORDER_ATTRIBUTES[recorder.__class__]
-            resource_attribute_id = self._get_resource_attribute_id(recorder.node.name, attribute)
+            attribute_name = self._get_attribute_name_from_recorder(recorder)
+
+            # Now we need to ensure there is a resource attribute for all nodes and recorder attributes
+            try:
+                resource_attribute_id = self._get_resource_attribute_id(recorder.node.name, attribute_name)
+            except ValueError:
+                for node in self.data['nodes']:
+                    if node['name'] == recorder.node.name:
+                        node_id = node['id']
+                        break
+                else:
+                    continue
+                attribute = self._get_attribute_from_name(attribute_name)
+
+                # Try to get the resource attribute
+                resource_attribute = client.add_resource_attribute('NODE', node_id, attribute['id'], is_var='Y',
+                                                                   error_on_duplicate=False)
+                resource_attribute_id = resource_attribute['id']
 
             resource_scenario = self._make_dataset_resource_scenario(recorder.name, value, 'dataframe', resource_attribute_id,
                                                                      encode_to_json=False)
